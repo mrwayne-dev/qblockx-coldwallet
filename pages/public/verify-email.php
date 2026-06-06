@@ -25,15 +25,15 @@ require_once '../../includes/head.php';
         <div class="auth-panel-stats">
           <div class="auth-panel-stat">
             <span class="auth-panel-stat-value">12K+</span>
-            <span class="auth-panel-stat-label">Investors</span>
+            <span class="auth-panel-stat-label">Holders</span>
           </div>
           <div class="auth-panel-stat">
             <span class="auth-panel-stat-value">$500M+</span>
-            <span class="auth-panel-stat-label">Managed</span>
+            <span class="auth-panel-stat-label">Secured</span>
           </div>
           <div class="auth-panel-stat">
-            <span class="auth-panel-stat-value">400%</span>
-            <span class="auth-panel-stat-label">Max Returns</span>
+            <span class="auth-panel-stat-value">100%</span>
+            <span class="auth-panel-stat-label">Offline Keys</span>
           </div>
         </div>
       </div>

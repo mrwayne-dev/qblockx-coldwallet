@@ -4,8 +4,8 @@
  * Page: Homepage
  */
 $pageTitle       = 'Home';
-$pageDescription = 'Qblockx is a multi-asset investment platform. Invest smarter in tiered plans, commodities, and real estate. Earn up to 400% with transparent, structured investment plans.';
-$pageKeywords    = 'Qblockx, investment platform, investment plans, commodities, real estate, multi-asset investing';
+$pageDescription = 'Qblockx keeps your private keys completely offline in an air-gapped cold wallet — disconnected from the internet and protected from remote hacks, malware, and phishing attacks.';
+$pageKeywords    = 'Qblockx, cold wallet, cold storage, offline crypto storage, air-gapped wallet, private key security, self-custody';
 require_once '../../includes/head.php';
 ?>
 
@@ -25,25 +25,25 @@ require_once '../../includes/head.php';
           <div class="badge-ring" style="animation-delay:-1s;"></div>
           <div class="badge-ring" style="animation-delay:-2s;"></div>
           <div class="badge-inner">
-            <i class="ph ph-chart-line-up" aria-hidden="true" style="margin-right:6px;"></i>
-            Welcome to Qblockx
+            <i class="ph ph-shield-check" aria-hidden="true" style="margin-right:6px;"></i>
+            Air-gapped cold storage
           </div>
         </div>
 
         <!-- H1 -->
         <h1 class="hero-h1 hero-h1--xl">
-          Invest smarter,<br>earn more.
+          Your keys,<br>completely offline.
         </h1>
 
         <!-- Subtext -->
         <p class="hero-subtext">
-          Qblockx gives you access to high-yield investment plans, commodities, and real estate — all in one transparent platform.
+          Qblockx stores your private keys in an air-gapped cold wallet — disconnected from the internet and shielded from remote hacks, malware, and phishing attacks.
         </p>
 
         <!-- CTAs -->
         <div class="hero-actions">
           <a href="/register" class="btn-primary">
-            Start Investing <i class="ph ph-arrow-right" aria-hidden="true"></i>
+            Secure My Crypto <i class="ph ph-arrow-right" aria-hidden="true"></i>
           </a>
           <a href="#how-it-works" class="btn-outline-white">
             How It Works
@@ -57,22 +57,22 @@ require_once '../../includes/head.php';
             <div class="hero-avatar" style="background:linear-gradient(135deg,#111C3A,#2262FF);"></div>
             <div class="hero-avatar" style="background:linear-gradient(135deg,#3FE0A1,#2262FF);"></div>
           </div>
-          <p class="hero-proof-text">Trusted by <strong>12,500+</strong> investors worldwide</p>
+          <p class="hero-proof-text">Trusted by <strong>12,500+</strong> self-custody holders worldwide</p>
         </div>
 
         <!-- Stats card — flows naturally centered -->
         <div class="hero-stats-card hero-stats-home">
           <div class="hero-stat">
-            <span class="hero-stat-value text-gradient-blue" data-counter="12500">0</span>
-            <span class="hero-stat-label">Active Investors</span>
+            <span class="hero-stat-value text-gradient-blue" data-counter="100" data-counter-suffix="%">0</span>
+            <span class="hero-stat-label">Keys Held Offline</span>
           </div>
           <div class="hero-stat">
-            <span class="hero-stat-value text-gradient-blue-rev" data-counter="400" data-counter-suffix="%">0</span>
-            <span class="hero-stat-label">Max Returns</span>
+            <span class="hero-stat-value text-gradient-blue-rev" data-counter="0">0</span>
+            <span class="hero-stat-label">Remote Breaches</span>
           </div>
           <div class="hero-stat">
             <span class="hero-stat-value text-gradient-blue" data-counter="500" data-counter-prefix="$" data-counter-suffix="M+">0</span>
-            <span class="hero-stat-label">Assets Managed</span>
+            <span class="hero-stat-label">Assets Secured</span>
           </div>
         </div>
 
@@ -84,7 +84,7 @@ require_once '../../includes/head.php';
 
   <!-- ── 1b. Logo Carousel ─────────────────────────────────────────── -->
   <section class="logo-carousel-section" aria-label="Trusted by leading institutions">
-    <p class="logo-carousel-label">Trusted by investors &amp; institutions worldwide</p>
+    <p class="logo-carousel-label">Securing digital assets alongside the industry's most trusted names</p>
     <div class="logo-ticker-wrap" aria-hidden="true">
       <div class="logo-ticker-track">
         <!-- First set -->
@@ -124,39 +124,39 @@ require_once '../../includes/head.php';
         <div class="why-bento-main" data-appear>
           <span class="section-label">WHY QBLOCKX</span>
           <h2 id="why-title" class="section-title">
-            Built for serious investors.<br>Designed for everyone.
+            Offline by design.<br>Secure by default.
           </h2>
           <p class="section-subtitle">
-            Qblockx combines institutional-grade investment infrastructure with a platform simple enough for first-time investors. No jargon, no hidden fees, no surprises.
+            Qblockx keeps your private keys in a fully air-gapped environment — never exposed to the internet. The result is custody-grade protection that stays simple enough for anyone to use.
           </p>
           <a href="/register" class="btn-primary" style="align-self:flex-start;">
-            Open an Account <i class="ph ph-arrow-right" aria-hidden="true"></i>
+            Open a Cold Wallet <i class="ph ph-arrow-right" aria-hidden="true"></i>
           </a>
         </div>
 
         <!-- Benefit cells -->
         <div class="why-bento-cell" data-appear>
-          <div class="why-bento-icon"><i class="ph ph-shield-check" aria-hidden="true"></i></div>
-          <div class="why-bento-title">Secure &amp; Audited</div>
-          <p class="why-bento-body">All funds held in segregated accounts. Independent audits every quarter.</p>
+          <div class="why-bento-icon"><i class="ph ph-wifi-slash" aria-hidden="true"></i></div>
+          <div class="why-bento-title">Air-Gapped Keys</div>
+          <p class="why-bento-body">Private keys are generated and stored completely offline — never touching a connected device.</p>
         </div>
 
         <div class="why-bento-cell" data-appear>
-          <div class="why-bento-icon"><i class="ph ph-chart-line-up" aria-hidden="true"></i></div>
-          <div class="why-bento-title">Transparent Returns</div>
-          <p class="why-bento-body">Every plan shows exact return percentages — verified, not estimated.</p>
+          <div class="why-bento-icon"><i class="ph ph-bug-beetle" aria-hidden="true"></i></div>
+          <div class="why-bento-title">Hack &amp; Malware Proof</div>
+          <p class="why-bento-body">With no internet exposure, remote hacks, malware, and phishing have nothing to attack.</p>
         </div>
 
         <div class="why-bento-cell" data-appear>
-          <div class="why-bento-icon"><i class="ph ph-currency-dollar" aria-hidden="true"></i></div>
-          <div class="why-bento-title">Flexible Withdrawals</div>
-          <p class="why-bento-body">Withdraw to your bank or crypto wallet at maturity. No lockup penalties.</p>
+          <div class="why-bento-icon"><i class="ph ph-key" aria-hidden="true"></i></div>
+          <div class="why-bento-title">You Hold the Keys</div>
+          <p class="why-bento-body">True self-custody. Only you can authorize a transfer — signed offline, every time.</p>
         </div>
 
         <div class="why-bento-cell" data-appear>
-          <div class="why-bento-icon"><i class="ph ph-globe" aria-hidden="true"></i></div>
-          <div class="why-bento-title">Global Access</div>
-          <p class="why-bento-body">Available to investors in 150+ countries with multi-currency deposit support.</p>
+          <div class="why-bento-icon"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i></div>
+          <div class="why-bento-title">Secure Recovery</div>
+          <p class="why-bento-body">Encrypted multi-share backups let you restore access without ever exposing your seed online.</p>
         </div>
 
       </div>
@@ -172,7 +172,7 @@ require_once '../../includes/head.php';
       <div class="section-header" data-appear>
         <h2 id="hiw-title" class="section-title">How does it work?</h2>
         <p class="section-subtitle" style="margin-top:var(--space-4);">
-          Three simple steps from registration to your first return. Setup takes under 10 minutes.
+          Three simple steps to move your crypto into air-gapped cold storage. Setup takes under 10 minutes.
         </p>
       </div>
 
@@ -181,213 +181,36 @@ require_once '../../includes/head.php';
         <!-- Step 1: wide cell -->
         <div class="hiw-bento-step hiw-bento-step--wide">
           <div class="hiw-bento-num" aria-hidden="true">01</div>
-          <h3 class="hiw-bento-title">Create your account</h3>
-          <p class="hiw-bento-body">Sign up in minutes. Verify your identity, fund your central wallet via bank transfer or crypto, and you're ready to invest. No minimums to open — capital requirements only apply when you activate a plan.</p>
+          <h3 class="hiw-bento-title">Create your cold wallet</h3>
+          <p class="hiw-bento-body">Sign up in minutes and generate a brand-new wallet whose private keys are created entirely offline. Your keys never touch an internet-connected server — they live in an air-gapped environment from the very first moment.</p>
           <a href="/register" class="how-step-link">Get Started <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
         </div>
 
         <!-- Visual cell: tall accent panel -->
         <div class="hiw-bento-visual" aria-hidden="true">
           <div class="hiw-bento-visual-inner">
-            <i class="ph ph-chart-line-up hiw-bento-visual-icon"></i>
-            <div class="hiw-bento-visual-stat">400%</div>
-            <div class="hiw-bento-visual-label">Max returns per cycle</div>
+            <i class="ph ph-wifi-slash hiw-bento-visual-icon"></i>
+            <div class="hiw-bento-visual-stat">100%</div>
+            <div class="hiw-bento-visual-label">Keys kept offline</div>
           </div>
         </div>
 
         <!-- Step 2 -->
         <div class="hiw-bento-step">
           <div class="hiw-bento-num" aria-hidden="true">02</div>
-          <h3 class="hiw-bento-title">Fund your wallet</h3>
-          <p class="hiw-bento-body">Transfer via bank or crypto. Capital is secured and ready to work immediately.</p>
+          <h3 class="hiw-bento-title">Deposit your assets</h3>
+          <p class="hiw-bento-body">Send crypto to your wallet address. Funds rest in cold storage, fully disconnected from the internet.</p>
           <a href="/register" class="how-step-link">Deposit Now <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
         </div>
 
         <!-- Step 3: accent dark -->
         <div class="hiw-bento-step hiw-bento-step--accent">
           <div class="hiw-bento-num" aria-hidden="true">03</div>
-          <h3 class="hiw-bento-title">Earn passive returns</h3>
-          <p class="hiw-bento-body">Select a plan and watch returns grow. Credit at maturity — withdraw anytime.</p>
-          <a href="#plans" class="how-step-link" style="color:rgba(107,153,255,0.90);">View Plans <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+          <h3 class="hiw-bento-title">Sign offline to move</h3>
+          <p class="hiw-bento-body">When you transfer out, transactions are signed in the air-gapped layer — your keys never go online.</p>
+          <a href="#security" class="how-step-link" style="color:rgba(107,153,255,0.90);">See Security <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
         </div>
 
-      </div>
-
-    </div>
-  </section>
-
-
-  <!-- ── 4. Investment Plans ───────────────────────────────────────── -->
-  <section class="section" id="plans" role="region" aria-labelledby="plans-title">
-    <div class="container">
-
-      <!-- Section header -->
-      <div style="text-align:center; margin-bottom:var(--space-12);" data-appear>
-        <span class="section-label">INVESTMENT PLANS</span>
-        <h2 id="plans-title" class="section-title" style="margin:var(--space-3) 0 var(--space-8);">
-          Choose your investment tier
-        </h2>
-        <!-- Tab toggle -->
-        <div class="plan-tabs" role="tablist" aria-label="Plan tiers">
-          <button class="plan-tab active" role="tab" aria-selected="true"
-                  data-plan-tab="starter" aria-controls="panel-starter" id="tab-starter">
-            Starter Plans
-          </button>
-          <button class="plan-tab" role="tab" aria-selected="false"
-                  data-plan-tab="elite" aria-controls="panel-elite" id="tab-elite">
-            Elite Plans
-          </button>
-        </div>
-      </div>
-
-      <!-- Starter Plans Panel -->
-      <div class="plan-panel active" id="panel-starter" role="tabpanel" aria-labelledby="tab-starter">
-        <div class="plan-grid">
-
-          <div class="plan-card plan-card--light" data-appear>
-            <span class="plan-badge plan-badge--starter">Starter</span>
-            <h3 class="plan-name">Micro</h3>
-            <div>
-              <div class="plan-return">Up to 30%</div>
-              <p class="plan-return-note">return per cycle</p>
-            </div>
-            <div class="plan-divider"></div>
-            <div class="plan-meta">
-              <div class="plan-meta-row"><span class="plan-meta-label">Min. Investment</span><span class="plan-meta-value">$1,000</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Max. Investment</span><span class="plan-meta-value">$4,999</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Duration</span><span class="plan-meta-value">7 Days</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Commission</span><span class="plan-meta-value">5% referral</span></div>
-            </div>
-            <a href="/register" class="plan-cta plan-cta--primary">Get Started <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
-          </div>
-
-          <div class="plan-card plan-card--light" data-appear>
-            <span class="plan-badge plan-badge--starter">Starter</span>
-            <h3 class="plan-name">Starter</h3>
-            <div>
-              <div class="plan-return">30–60%</div>
-              <p class="plan-return-note">return per cycle</p>
-            </div>
-            <div class="plan-divider"></div>
-            <div class="plan-meta">
-              <div class="plan-meta-row"><span class="plan-meta-label">Min. Investment</span><span class="plan-meta-value">$5,000</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Max. Investment</span><span class="plan-meta-value">$9,999</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Duration</span><span class="plan-meta-value">14 Days</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Commission</span><span class="plan-meta-value">5% referral</span></div>
-            </div>
-            <a href="/register" class="plan-cta plan-cta--primary">Get Started <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
-          </div>
-
-          <div class="plan-card plan-card--light" data-appear>
-            <span class="plan-badge plan-badge--starter">Starter</span>
-            <h3 class="plan-name">Growth</h3>
-            <div>
-              <div class="plan-return">60–100%</div>
-              <p class="plan-return-note">return per cycle</p>
-            </div>
-            <div class="plan-divider"></div>
-            <div class="plan-meta">
-              <div class="plan-meta-row"><span class="plan-meta-label">Min. Investment</span><span class="plan-meta-value">$10,000</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Max. Investment</span><span class="plan-meta-value">$24,999</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Duration</span><span class="plan-meta-value">21 Days</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Commission</span><span class="plan-meta-value">5% referral</span></div>
-            </div>
-            <a href="/register" class="plan-cta plan-cta--primary">Get Started <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
-          </div>
-
-          <div class="plan-card plan-card--light" data-appear>
-            <span class="plan-badge plan-badge--starter">Starter</span>
-            <h3 class="plan-name">Pro</h3>
-            <div>
-              <div class="plan-return">100–150%</div>
-              <p class="plan-return-note">return per cycle</p>
-            </div>
-            <div class="plan-divider"></div>
-            <div class="plan-meta">
-              <div class="plan-meta-row"><span class="plan-meta-label">Min. Investment</span><span class="plan-meta-value">$25,000</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Max. Investment</span><span class="plan-meta-value">$49,999</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Duration</span><span class="plan-meta-value">30 Days</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Commission</span><span class="plan-meta-value">5% referral</span></div>
-            </div>
-            <a href="/register" class="plan-cta plan-cta--primary">Get Started <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
-          </div>
-
-        </div>
-      </div>
-
-      <!-- Elite Plans Panel -->
-      <div class="plan-panel" id="panel-elite" role="tabpanel" aria-labelledby="tab-elite">
-        <div class="plan-grid">
-
-          <div class="plan-card plan-card--dark" data-appear>
-            <span class="plan-badge plan-badge--elite">Elite</span>
-            <h3 class="plan-name">Basic</h3>
-            <div>
-              <div class="plan-return">Up to 200%</div>
-              <p class="plan-return-note">return per cycle</p>
-            </div>
-            <div class="plan-divider"></div>
-            <div class="plan-meta">
-              <div class="plan-meta-row"><span class="plan-meta-label">Min. Investment</span><span class="plan-meta-value">$50,000</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Max. Investment</span><span class="plan-meta-value">$99,999</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Duration</span><span class="plan-meta-value">14 Days</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Commission</span><span class="plan-meta-value">7% referral</span></div>
-            </div>
-            <a href="/register" class="plan-cta plan-cta--outline">Get Started <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
-          </div>
-
-          <div class="plan-card plan-card--dark" data-appear>
-            <span class="plan-badge plan-badge--elite">Elite</span>
-            <h3 class="plan-name">Silver</h3>
-            <div>
-              <div class="plan-return">200–250%</div>
-              <p class="plan-return-note">return per cycle</p>
-            </div>
-            <div class="plan-divider"></div>
-            <div class="plan-meta">
-              <div class="plan-meta-row"><span class="plan-meta-label">Min. Investment</span><span class="plan-meta-value">$100,000</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Max. Investment</span><span class="plan-meta-value">$499,999</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Duration</span><span class="plan-meta-value">30 Days</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Commission</span><span class="plan-meta-value">7% referral</span></div>
-            </div>
-            <a href="/register" class="plan-cta plan-cta--outline">Get Started <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
-          </div>
-
-          <div class="plan-card plan-card--dark" data-appear>
-            <span class="plan-badge plan-badge--elite">Elite</span>
-            <h3 class="plan-name">Gold</h3>
-            <div>
-              <div class="plan-return">250–350%</div>
-              <p class="plan-return-note">compounded returns</p>
-            </div>
-            <div class="plan-divider"></div>
-            <div class="plan-meta">
-              <div class="plan-meta-row"><span class="plan-meta-label">Min. Investment</span><span class="plan-meta-value">$500,000</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Max. Investment</span><span class="plan-meta-value">$999,999</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Duration</span><span class="plan-meta-value">90 Days</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Commission</span><span class="plan-meta-value">10% referral</span></div>
-            </div>
-            <a href="/register" class="plan-cta plan-cta--outline">Get Started <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
-          </div>
-
-          <div class="plan-card plan-card--dark" data-appear>
-            <span class="plan-badge plan-badge--elite">Elite</span>
-            <h3 class="plan-name">Platinum</h3>
-            <div>
-              <div class="plan-return">300–400%</div>
-              <p class="plan-return-note">compounded returns</p>
-            </div>
-            <div class="plan-divider"></div>
-            <div class="plan-meta">
-              <div class="plan-meta-row"><span class="plan-meta-label">Min. Investment</span><span class="plan-meta-value">$1,000,000</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Max. Investment</span><span class="plan-meta-value">$10,000,000</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Duration</span><span class="plan-meta-value">365 Days</span></div>
-              <div class="plan-meta-row"><span class="plan-meta-label">Commission</span><span class="plan-meta-value">10% referral</span></div>
-            </div>
-            <a href="/register" class="plan-cta plan-cta--outline">Get Started <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
-          </div>
-
-        </div>
       </div>
 
     </div>
@@ -400,99 +223,36 @@ require_once '../../includes/head.php';
       <div class="container">
 
         <div style="text-align:center; margin-bottom:var(--space-12);" data-appear>
-          <span class="section-label" style="color:rgba(211,216,233,0.70);">ASSET CLASSES</span>
+          <span class="section-label" style="color:rgba(211,216,233,0.70);">SUPPORTED ASSETS</span>
           <h2 id="assets-title" class="section-title" style="color:#fff; margin-top:var(--space-3);">
-            Diversify across asset classes
+            Cold storage for every chain
           </h2>
         </div>
 
         <div class="asset-cards" data-appear>
 
           <div class="asset-card">
-            <div class="asset-card-icon"><i class="ph ph-chart-pie" aria-hidden="true"></i></div>
-            <h3 class="asset-card-title">Investment Plans</h3>
-            <p class="asset-card-body">Choose from 8 tiered plans ranging from $1,000 to $10M. Fixed durations, clear returns, zero ambiguity.</p>
-            <a href="#plans" class="asset-card-link">Explore Plans <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+            <div class="asset-card-icon"><i class="ph ph-currency-btc" aria-hidden="true"></i></div>
+            <h3 class="asset-card-title">Bitcoin</h3>
+            <p class="asset-card-body">Store BTC in deep cold storage with offline key generation and air-gapped transaction signing.</p>
+            <a href="/register" class="asset-card-link">Secure BTC <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
           </div>
 
           <div class="asset-card">
-            <div class="asset-card-icon"><i class="ph ph-coins" aria-hidden="true"></i></div>
-            <h3 class="asset-card-title">Commodities</h3>
-            <p class="asset-card-body">Invest in precious metals, energy, and agricultural commodities. Hedge against inflation with tangible assets.</p>
-            <a href="/register" class="asset-card-link">Start Investing <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+            <div class="asset-card-icon"><i class="ph ph-currency-eth" aria-hidden="true"></i></div>
+            <h3 class="asset-card-title">Ethereum &amp; ERC-20</h3>
+            <p class="asset-card-body">Keep ETH and any ERC-20 token offline — stablecoins, DeFi assets, and more, all under your keys.</p>
+            <a href="/register" class="asset-card-link">Secure ETH <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
           </div>
 
           <div class="asset-card">
-            <div class="asset-card-icon"><i class="ph ph-buildings" aria-hidden="true"></i></div>
-            <h3 class="asset-card-title">Real Estate</h3>
-            <p class="asset-card-body">Access fractional real estate investments in global markets. Build a property portfolio without full capital outlay.</p>
-            <a href="/register" class="asset-card-link">Explore Properties <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+            <div class="asset-card-icon"><i class="ph ph-globe-hemisphere-west" aria-hidden="true"></i></div>
+            <h3 class="asset-card-title">Multi-Chain</h3>
+            <p class="asset-card-body">Support for major networks including Solana, BNB Chain, Tron, and more — one air-gapped wallet for all.</p>
+            <a href="/register" class="asset-card-link">View Networks <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
           </div>
 
         </div>
-      </div>
-    </div>
-  </section>
-
-
-  <!-- ── 6. Testimonials ───────────────────────────────────────────── -->
-  <section class="section" role="region" aria-labelledby="testimonials-title">
-    <div class="container">
-
-      <div class="section-header" data-appear>
-        <span class="section-label">TESTIMONIALS</span>
-        <h2 id="testimonials-title" class="section-title" style="margin-top:var(--space-3);">
-          What our investors say
-        </h2>
-      </div>
-
-      <div class="review-cards" data-appear>
-
-        <div class="review-card">
-          <div class="review-stars">
-            <i class="ph ph-star-fill" aria-hidden="true"></i>
-            <i class="ph ph-star-fill" aria-hidden="true"></i>
-            <i class="ph ph-star-fill" aria-hidden="true"></i>
-            <i class="ph ph-star-fill" aria-hidden="true"></i>
-            <i class="ph ph-star-fill" aria-hidden="true"></i>
-          </div>
-          <p class="review-text">"I've tried several investment platforms but Qblockx stands out. The returns are transparent, the plans are clear, and my withdrawals have always been on time."</p>
-          <div>
-            <div class="review-author">James O.</div>
-            <div class="review-author-role">Starter Plan Investor, Lagos</div>
-          </div>
-        </div>
-
-        <div class="review-card">
-          <div class="review-stars">
-            <i class="ph ph-star-fill" aria-hidden="true"></i>
-            <i class="ph ph-star-fill" aria-hidden="true"></i>
-            <i class="ph ph-star-fill" aria-hidden="true"></i>
-            <i class="ph ph-star-fill" aria-hidden="true"></i>
-            <i class="ph ph-star-fill" aria-hidden="true"></i>
-          </div>
-          <p class="review-text">"The Elite Gold plan exceeded my expectations. Compounded returns in 90 days — completely verifiable. The dashboard makes tracking everything effortless."</p>
-          <div>
-            <div class="review-author">Priya S.</div>
-            <div class="review-author-role">Elite Plan Investor, London</div>
-          </div>
-        </div>
-
-        <div class="review-card">
-          <div class="review-stars">
-            <i class="ph ph-star-fill" aria-hidden="true"></i>
-            <i class="ph ph-star-fill" aria-hidden="true"></i>
-            <i class="ph ph-star-fill" aria-hidden="true"></i>
-            <i class="ph ph-star-fill" aria-hidden="true"></i>
-            <i class="ph ph-star-fill" aria-hidden="true"></i>
-          </div>
-          <p class="review-text">"Getting started was easier than I expected. The support team walked me through everything. I've already referred three colleagues who are now investing."</p>
-          <div>
-            <div class="review-author">Marcus W.</div>
-            <div class="review-author-role">Growth Plan Investor, Toronto</div>
-          </div>
-        </div>
-
       </div>
     </div>
   </section>
@@ -503,12 +263,12 @@ require_once '../../includes/head.php';
     <div class="container">
 
       <div style="text-align:center; margin-bottom:var(--space-12);" data-appear>
-        <span class="section-label">SECURITY &amp; COMPLIANCE</span>
+        <span class="section-label">SECURITY &amp; ARCHITECTURE</span>
         <h2 id="security-title" class="section-title" style="margin-top:var(--space-3);">
-          Enterprise-grade security
+          Air-gapped by architecture
         </h2>
         <p class="section-subtitle" style="max-width:520px; margin:var(--space-4) auto 0;">
-          Your assets are protected by institutional-level infrastructure, verified audits, and continuous compliance monitoring.
+          Your private keys are generated and stored in an environment that is physically disconnected from the internet — there is no remote path to your funds.
         </p>
       </div>
 
@@ -516,11 +276,11 @@ require_once '../../includes/head.php';
 
         <div class="security-stat-card">
           <div class="security-stat-icon">
-            <i class="ph ph-lock" aria-hidden="true"></i>
+            <i class="ph ph-wifi-slash" aria-hidden="true"></i>
           </div>
-          <div class="security-stat-value">256-bit</div>
-          <div class="security-stat-name">AES Encryption</div>
-          <p class="security-stat-desc">All data and transactions are encrypted with bank-grade AES-256, the same standard used by global financial institutions.</p>
+          <div class="security-stat-value">100%</div>
+          <div class="security-stat-name">Offline Keys</div>
+          <p class="security-stat-desc">Private keys never touch a connected device. The air gap removes the entire remote attack surface — hacks, malware, and phishing simply can't reach them.</p>
         </div>
 
         <div class="security-stat-card security-stat-card--accent">
@@ -528,17 +288,17 @@ require_once '../../includes/head.php';
             <i class="ph ph-shield-check" aria-hidden="true"></i>
           </div>
           <div class="security-stat-value">0</div>
-          <div class="security-stat-name">Security Incidents</div>
-          <p class="security-stat-desc">Since launch, Qblockx has maintained a perfect security record — zero breaches, zero unauthorized access, zero fund losses.</p>
+          <div class="security-stat-name">Remote Breaches</div>
+          <p class="security-stat-desc">Since launch, Qblockx has maintained a perfect record — zero remote breaches, zero key compromises, zero fund losses.</p>
         </div>
 
         <div class="security-stat-card">
           <div class="security-stat-icon">
-            <i class="ph ph-certificate" aria-hidden="true"></i>
+            <i class="ph ph-fingerprint" aria-hidden="true"></i>
           </div>
-          <div class="security-stat-value">CISA+</div>
-          <div class="security-stat-name">Security Certified</div>
-          <p class="security-stat-desc">Certified by leading cybersecurity bodies with continuous penetration testing and independent infrastructure monitoring.</p>
+          <div class="security-stat-value">Multi-Sig</div>
+          <div class="security-stat-name">Offline Signing</div>
+          <p class="security-stat-desc">Every transfer is signed inside the air-gapped layer and protected by configurable multi-signature approval — no single point of failure.</p>
         </div>
 
       </div>
@@ -559,7 +319,7 @@ require_once '../../includes/head.php';
             Common questions
           </h2>
           <p class="section-subtitle" style="margin-top:var(--space-4);">
-            Everything you need to know about investing with Qblockx. Can't find your answer?
+            Everything you need to know about cold storage with Qblockx. Can't find your answer?
           </p>
           <a href="/contact" class="btn-primary" style="margin-top:var(--space-8); display:inline-flex;">
             Ask us directly <i class="ph ph-arrow-right" aria-hidden="true"></i>
@@ -570,33 +330,33 @@ require_once '../../includes/head.php';
         <div class="faq-list" data-appear>
 
           <details class="faq-item">
-            <summary>How are investment returns calculated?</summary>
-            <div class="faq-body">Returns are calculated on your principal investment amount based on the plan tier and duration. All return percentages are fixed at the time of investment and verified in real time on your dashboard.</div>
+            <summary>What is a cold wallet?</summary>
+            <div class="faq-body">A cold wallet is a cryptocurrency storage method that keeps your private keys completely offline, disconnected from the internet. This creates an air-gapped environment that protects your digital assets from remote hacks, malware, and phishing attacks.</div>
           </details>
 
           <details class="faq-item">
-            <summary>When can I withdraw my funds?</summary>
-            <div class="faq-body">Withdrawals are available at plan maturity. You can choose to receive funds via bank transfer or crypto wallet within 24–72 hours of submitting a request.</div>
+            <summary>How are my private keys kept offline?</summary>
+            <div class="faq-body">Your keys are generated and stored inside an air-gapped layer that is never connected to the internet. When you move funds, the transaction is signed offline and only the signed result — never the key itself — passes to the online network.</div>
           </details>
 
           <details class="faq-item">
-            <summary>Is my investment insured or protected?</summary>
-            <div class="faq-body">All client funds are held in segregated accounts and protected by our institutional-grade security infrastructure. Independent audits are conducted quarterly to verify fund integrity and compliance.</div>
+            <summary>What happens if I lose access to my device?</summary>
+            <div class="faq-body">Qblockx uses encrypted multi-share recovery. Your seed is split into encrypted shares so you can restore your wallet without ever exposing the full seed phrase online. Higher tiers add inheritance and multi-signature recovery options.</div>
           </details>
 
           <details class="faq-item">
-            <summary>What is the minimum investment amount?</summary>
-            <div class="faq-body">The minimum investment starts at $1,000 on the Micro plan. Each tier has defined minimums and maximums — you can view full details on the <a href="#plans" style="color:var(--color-accent);">Investment Plans</a> section.</div>
+            <summary>Which assets can I store?</summary>
+            <div class="faq-body">Bitcoin, Ethereum and all ERC-20 tokens, plus major networks like Solana, BNB Chain, and Tron. View the full list in the <a href="#assets" style="color:var(--color-accent);">Supported Assets</a> section.</div>
           </details>
 
           <details class="faq-item">
-            <summary>Can I invest in multiple plans simultaneously?</summary>
-            <div class="faq-body">Yes. You can hold multiple active investments across different plan tiers at the same time. Your dashboard consolidates all active plans, returns, and withdrawal history in a single unified view.</div>
+            <summary>Do you ever have access to my crypto?</summary>
+            <div class="faq-body">No. Qblockx is self-custody — only you hold the keys, and every transfer requires your offline signature. We cannot move, freeze, or access your funds.</div>
           </details>
 
           <details class="faq-item">
             <summary>How do I get started?</summary>
-            <div class="faq-body">Create a free account, complete identity verification, fund your wallet via bank transfer or cryptocurrency, and select an investment plan. The entire setup takes under 10 minutes.</div>
+            <div class="faq-body">Create a free account, generate your air-gapped cold wallet, and deposit your crypto. Your keys are offline from the very first moment — the entire setup takes under 10 minutes.</div>
           </details>
 
         </div>
@@ -611,10 +371,10 @@ require_once '../../includes/head.php';
     <div class="section-dark" style="padding:var(--space-20) var(--space-6); text-align:center;">
       <div style="max-width:600px; margin:0 auto;" data-appear>
         <h2 id="cta-title" class="section-title" style="color:#fff; margin-bottom:var(--space-5);">
-          Start growing your wealth today
+          Take your crypto offline today
         </h2>
         <p class="section-subtitle" style="color:rgba(255,255,255,0.55); margin-bottom:var(--space-10);">
-          Join thousands of investors already earning with Qblockx.
+          Join thousands of holders already securing their assets with Qblockx cold storage.
         </p>
         <div class="cta-actions">
           <a href="/register" class="btn-primary">Create Free Account <i class="ph ph-arrow-right" aria-hidden="true"></i></a>
@@ -626,6 +386,5 @@ require_once '../../includes/head.php';
 
 </main>
 
-<?php require_once '../../includes/footer.php'; ?>
 </body>
 </html>

@@ -22,14 +22,6 @@ function navActive(string $page, string $current): string {
       <span class="nav-logo-text">QBLOCKX</span>
     </a>
 
-    <!-- Desktop inline nav links -->
-    <nav class="nav-links-desktop" aria-label="Main navigation">
-      <a href="/plans"<?= navActive('plans.php', $currentPage) ?>>Plans</a>
-      <a href="/commodities"<?= navActive('commodities.php', $currentPage) ?>>Commodities</a>
-      <a href="/realestate"<?= navActive('realestate.php', $currentPage) ?>>Real Estate</a>
-      <a href="/about"<?= navActive('about.php', $currentPage) ?>>About</a>
-    </nav>
-
     <!-- Actions -->
     <div class="nav-actions">
       <a href="/login" class="nav-login-link">Log in</a>
@@ -56,14 +48,6 @@ function navActive(string $page, string $current): string {
       <img src="/assets/images/logo/logowhite.png" alt="" style="height:24px;">
       <span>QBLOCKX</span>
     </a>
-
-    <nav class="mobile-drawer-nav" aria-label="Mobile navigation">
-      <a href="/"<?= navActive('index.php', $currentPage) ?>>Home</a>
-      <a href="/plans"<?= navActive('plans.php', $currentPage) ?>>Plans</a>
-      <a href="/commodities"<?= navActive('commodities.php', $currentPage) ?>>Commodities</a>
-      <a href="/realestate"<?= navActive('realestate.php', $currentPage) ?>>Real Estate</a>
-      <a href="/about"<?= navActive('about.php', $currentPage) ?>>About</a>
-    </nav>
 
     <div class="mobile-drawer-actions">
       <a href="/login" class="mobile-drawer-login">Log In</a>

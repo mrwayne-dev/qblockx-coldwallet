@@ -6,8 +6,8 @@
  * Set $pageDescription, $pageKeywords to override defaults.
  */
 $pageTitle       = $pageTitle       ?? 'Qblockx';
-$pageDescription = $pageDescription ?? 'Qblockx is a multi-asset investment platform. Invest smarter in tiered plans, commodities, and real estate. Earn up to 400% with transparent, structured investment plans.';
-$pageKeywords    = $pageKeywords    ?? 'Qblockx, investment platform, investment plans, commodities, real estate, multi-asset investing, high-yield investments';
+$pageDescription = $pageDescription ?? 'Qblockx is a cold wallet storage platform that keeps your private keys completely offline. Air-gapped security protects your crypto from remote hacks, malware, and phishing.';
+$pageKeywords    = $pageKeywords    ?? 'Qblockx, cold wallet, cold storage, offline crypto storage, air-gapped wallet, private key security, hardware wallet, self-custody';
 ?>
 <!DOCTYPE html>
 <html lang="en">

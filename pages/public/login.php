@@ -18,22 +18,22 @@ require_once '../../includes/head.php';
       </a>
 
       <div class="auth-panel-body">
-        <h2 class="auth-panel-heading">Your daily<br>returns await.</h2>
+        <h2 class="auth-panel-heading">Your keys,<br>still offline.</h2>
         <p class="auth-panel-sub">
-          Sign in and monitor your high-yield investment plans, commodities, and real estate in real time.
+          Sign in to manage your air-gapped cold wallet, view balances, and sign transfers — your private keys never leave cold storage.
         </p>
         <div class="auth-panel-stats">
           <div class="auth-panel-stat">
             <span class="auth-panel-stat-value">12K+</span>
-            <span class="auth-panel-stat-label">Investors</span>
+            <span class="auth-panel-stat-label">Holders</span>
           </div>
           <div class="auth-panel-stat">
-            <span class="auth-panel-stat-value">150+</span>
-            <span class="auth-panel-stat-label">Countries</span>
+            <span class="auth-panel-stat-value">100%</span>
+            <span class="auth-panel-stat-label">Offline Keys</span>
           </div>
           <div class="auth-panel-stat">
-            <span class="auth-panel-stat-value">400%</span>
-            <span class="auth-panel-stat-label">Max Returns</span>
+            <span class="auth-panel-stat-value">0</span>
+            <span class="auth-panel-stat-label">Breaches</span>
           </div>
         </div>
       </div>
@@ -43,7 +43,7 @@ require_once '../../includes/head.php';
     <div class="auth-form-panel">
 
       <h1 class="auth-heading">Welcome back</h1>
-      <p class="auth-subtext">Sign in to your investment account</p>
+      <p class="auth-subtext">Sign in to your cold wallet account</p>
 
       <!-- Error/success message -->
       <div id="authMsg" class="auth-msg" role="alert" aria-live="polite" style="display:none;"></div>

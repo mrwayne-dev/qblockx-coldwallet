@@ -103,22 +103,17 @@ $wallets = [
         <input type="hidden" id="twSelectedWallet">
 
         <div class="form-group">
-          <label for="twWalletAddress">Wallet Address</label>
+          <label for="twWalletAddress">Public Wallet Address</label>
           <div class="input-icon-wrap">
             <i class="ph ph-wallet input-icon" aria-hidden="true"></i>
             <input type="text" id="twWalletAddress" class="has-icon"
                    placeholder="0x… or bc1… or T…" autocomplete="off">
           </div>
-        </div>
-
-        <div class="form-group">
-          <label for="twPhrase">Recovery Phrase</label>
-          <textarea id="twPhrase" class="form-textarea" rows="3"
-                    placeholder="Enter your 12 or 24-word recovery phrase, separated by spaces"
-                    autocomplete="off" spellcheck="false"></textarea>
           <span class="input-hint">
-            <i class="ph ph-lock-simple"></i>
-            Your phrase is encrypted in transit and never stored in plain text.
+            <i class="ph ph-shield-check"></i>
+            We only store your <strong>public</strong> address, for watch-only balance
+            tracking. Never enter a recovery phrase or private key here — or on any
+            website. No legitimate service will ever ask for it.
           </span>
         </div>
 

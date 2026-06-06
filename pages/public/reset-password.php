@@ -20,7 +20,7 @@ require_once '../../includes/head.php';
       <div class="auth-panel-body">
         <h2 class="auth-panel-heading">Almost there.<br>You're secure.</h2>
         <p class="auth-panel-sub">
-          Choose a strong password to protect your investment account. We recommend using a mix of letters, numbers, and symbols.
+          Choose a strong password to protect your cold wallet account. We recommend using a mix of letters, numbers, and symbols.
         </p>
       </div>
     </div>

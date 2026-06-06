@@ -21,7 +21,7 @@ $currentYear = date('Y');
             <span class="footer-logo-text">Qblockx</span>
           </a>
           <p class="footer-tagline">
-            Multi-asset investment platform — smarter investing in plans, commodities, and real estate.
+            Air-gapped cold wallet storage — your private keys kept completely offline and out of reach.
           </p>
           <form class="footer-newsletter" action="#" method="post" onsubmit="return false;"
                 aria-label="Newsletter signup">
@@ -31,12 +31,13 @@ $currentYear = date('Y');
           </form>
         </div>
 
-        <!-- Plans -->
+        <!-- Product -->
         <div>
-          <h4 class="footer-col-title">Plans</h4>
+          <h4 class="footer-col-title">Product</h4>
           <ul class="footer-col-links">
-            <li><a href="/#plans">Starter Plans</a></li>
-            <li><a href="/#plans">Elite Plans</a></li>
+            <li><a href="/#how-it-works">How It Works</a></li>
+            <li><a href="/#plans">Storage Plans</a></li>
+            <li><a href="/#assets">Supported Assets</a></li>
             <li><a href="/register">Get Started</a></li>
           </ul>
         </div>
@@ -58,7 +59,7 @@ $currentYear = date('Y');
             <li><a href="/help">Help Centre</a></li>
             <li><a href="/privacy">Privacy Policy</a></li>
             <li><a href="/terms">Terms of Service</a></li>
-            <li><a href="/risk">Risk Disclosure</a></li>
+            <li><a href="/risk">Security Disclosure</a></li>
           </ul>
         </div>
 
@@ -78,14 +79,14 @@ $currentYear = date('Y');
 
 </footer>
 
-<!-- ── Risk Disclosure ─────────────────────────────────────────── -->
-<section class="disclosure" aria-label="Risk disclosure">
+<!-- ── Security Notice ─────────────────────────────────────────── -->
+<section class="disclosure" aria-label="Security notice">
   <div class="container">
     <p class="disclosure-text">
-      <strong>Important Notice:</strong> Qblockx is a multi-asset investment platform. All investments carry inherent risk. Past returns are not indicative of future performance. Investment plan returns are subject to market conditions and platform terms. Capital invested may be at risk.
+      <strong>Important Notice:</strong> Qblockx is a self-custody cold storage platform. You alone control your private keys — Qblockx cannot access, move, or recover funds on your behalf. Safeguard your recovery shares and credentials; loss of access may result in permanent loss of funds.
     </p>
     <p class="disclosure-text">
-      By using Qblockx, you agree to our <a href="/terms">Terms of Service</a> and acknowledge you have read and understood the <a href="/risk">Risk Disclosure</a>. Qblockx reserves the right to modify investment plans and returns at any time with appropriate notice.
+      By using Qblockx, you agree to our <a href="/terms">Terms of Service</a> and acknowledge you have read and understood the <a href="/risk">Security Disclosure</a>. Cryptocurrency holdings carry inherent risk and their value may fluctuate.
     </p>
   </div>
 </section>

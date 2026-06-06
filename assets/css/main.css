@@ -489,6 +489,7 @@ h1, h2, h3, h4 {
   align-items: center;
   gap: var(--space-3);
   justify-self: end;
+  grid-column: 3;
 }
 
 .nav-login-link {

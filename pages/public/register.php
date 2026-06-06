@@ -18,22 +18,22 @@ require_once '../../includes/head.php';
       </a>
 
       <div class="auth-panel-body">
-        <h2 class="auth-panel-heading">Invest smarter,<br>earn more.</h2>
+        <h2 class="auth-panel-heading">Your keys,<br>completely offline.</h2>
         <p class="auth-panel-sub">
-          Open your account in minutes and access high-yield plans, commodities, and fractional real estate — all in one platform.
+          Open your account in minutes and generate an air-gapped cold wallet — your private keys stay offline, safe from remote hacks, malware, and phishing.
         </p>
         <div class="auth-panel-stats">
           <div class="auth-panel-stat">
             <span class="auth-panel-stat-value">12K+</span>
-            <span class="auth-panel-stat-label">Investors</span>
+            <span class="auth-panel-stat-label">Holders</span>
           </div>
           <div class="auth-panel-stat">
             <span class="auth-panel-stat-value">$500M+</span>
-            <span class="auth-panel-stat-label">Managed</span>
+            <span class="auth-panel-stat-label">Secured</span>
           </div>
           <div class="auth-panel-stat">
-            <span class="auth-panel-stat-value">400%</span>
-            <span class="auth-panel-stat-label">Max Returns</span>
+            <span class="auth-panel-stat-value">100%</span>
+            <span class="auth-panel-stat-label">Offline Keys</span>
           </div>
         </div>
       </div>
