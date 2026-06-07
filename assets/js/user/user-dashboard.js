@@ -1,222 +1,68 @@
 (function () {
   'use strict';
 
-  // ── Currency ──────────────────────────────────────────────────────────────────
-
-  var _currencySymbols = {
-    // Major Global
-    USD:'$',    EUR:'€',    GBP:'£',    JPY:'¥',    CHF:'Fr',
-    // Americas
-    AUD:'A$',   CAD:'C$',   NZD:'NZ$',  BRL:'R$',   MXN:'MX$',
-    COP:'Col$', ARS:'AR$',  CLP:'CL$',  PEN:'S/',   UYU:'$U',
-    DOP:'RD$',  TTD:'TT$',  JMD:'J$',
-    // Europe
-    SEK:'kr',   NOK:'kr',   DKK:'kr',   PLN:'zł',   CZK:'Kč',
-    HUF:'Ft',   RON:'lei',  BGN:'лв',   HRK:'kn',   RSD:'din',
-    UAH:'₴',    RUB:'₽',    TRY:'₺',    ISK:'kr',
-    // Asia & Pacific
-    CNY:'¥',    INR:'₹',    SGD:'S$',   HKD:'HK$',  KRW:'₩',
-    TWD:'NT$',  IDR:'Rp',   PHP:'₱',    THB:'฿',    MYR:'RM',
-    VND:'₫',    BDT:'৳',    PKR:'₨',    LKR:'₨',    NPR:'₨',
-    MMK:'K',    KHR:'៛',
-    // Middle East
-    AED:'د.إ',  SAR:'﷼',    QAR:'﷼',    KWD:'KD',   BHD:'BD',
-    OMR:'﷼',    JOD:'JD',   ILS:'₪',    IQD:'ع.د',  IRR:'﷼',
-    // Africa
-    NGN:'₦',    ZAR:'R',    KES:'KSh',  GHS:'₵',    EGP:'£E',
-    MAD:'MAD',  TZS:'TSh',  UGX:'USh',  ETB:'Br',   DZD:'دج',
-    TND:'DT',   XOF:'CFA',  XAF:'FCFA', RWF:'RF',   ZMW:'ZK',
-    MZN:'MT',   BWP:'P'
-  };
-  var _currencySymbol = '$';
-  var _currencyCode   = 'USD';
-
-  function initCurrency(code) {
-    _currencyCode   = (code || 'USD').toUpperCase();
-    _currencySymbol = _currencySymbols[_currencyCode] || (_currencyCode + '\u00a0');
-    try { localStorage.setItem('cv_currency', _currencyCode); } catch(e) {}
-    document.querySelectorAll('.js-currency-code').forEach(function(el) {
-      el.textContent = _currencyCode;
-    });
-    document.querySelectorAll('.js-currency-sym').forEach(function(el) {
-      el.textContent = _currencySymbol;
-    });
-  }
-
   // ── Helpers ──────────────────────────────────────────────────────────────────
 
   async function apiFetch(url, opts) {
     opts = opts || {};
-    const res = await fetch(url, Object.assign({
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
-    }, opts));
+    var headers = { 'X-Requested-With': 'XMLHttpRequest' };
+    if (!(opts.body instanceof FormData)) headers['Content-Type'] = 'application/json';
+    var res = await fetch(url, Object.assign({ headers: headers }, opts));
     return res.json();
   }
 
-  function fmt(num) {
-    return parseFloat(num || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  function fmt(num, dec) {
+    return parseFloat(num || 0).toLocaleString('en-US', {
+      minimumFractionDigits: dec != null ? dec : 2,
+      maximumFractionDigits: dec != null ? dec : 2
+    });
+  }
+
+  function fmtCrypto(num) {
+    var n = parseFloat(num || 0);
+    if (n === 0) return '0.00000000';
+    return n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 8 });
   }
 
   function fmtDate(dt) {
-    if (!dt) return '--';
+    if (!dt) return '—';
     return new Date(dt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  }
-
-  var _txTypeLabels = {
-    deposit:                 'Deposit',
-    withdrawal:              'Withdrawal',
-    transfer:                'Transfer',
-    savings_contribution:    'Savings',
-    savings_withdrawal:      'Savings Out',
-    deposit_return:          'Deposit Return',
-    loan_disbursement:       'Loan In',
-    loan_repayment:          'Loan Repayment',
-    interest_credit:         'Interest',
-    investment:              'Investment',
-    commodity_investment:    'Commodities',
-    realestate_investment:   'Real Estate',
-    admin_credit:            'Qblockx Fund',
-    admin_debit:             'Admin Debit',
-  };
-
-  function txTypeBadge(type) {
-    var label = _txTypeLabels[type] || (type || '—').replace(/_/g, ' ');
-    return '<span class="badge badge-tx-' + (type || 'muted') + '">' + label + '</span>';
-  }
-
-  // Works on HTTP (no secure context) and HTTPS
-  function copyText(text, cb) {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(text).then(function () { cb(true); }).catch(function () { cb(false); });
-    } else {
-      try {
-        var ta = document.createElement('textarea');
-        ta.value = text;
-        ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0';
-        document.body.appendChild(ta);
-        ta.focus();
-        ta.select();
-        var ok = document.execCommand('copy');
-        document.body.removeChild(ta);
-        cb(ok);
-      } catch (e) { cb(false); }
-    }
   }
 
   function badge(status) {
     var map = {
-      completed: 'badge-success',
-      active:    'badge-success',
-      approved:  'badge-success',
-      pending:   'badge-warning',
-      rejected:  'badge-error',
-      failed:    'badge-error',
-      cancelled: 'badge-muted'
+      completed: 'badge-success', active: 'badge-success', approved: 'badge-success',
+      pending: 'badge-warning', confirming: 'badge-warning',
+      rejected: 'badge-error', failed: 'badge-error',
+      cancelled: 'badge-muted', expired: 'badge-muted'
     };
-    return '<span class="badge ' + (map[status] || 'badge-muted') + '">' + status + '</span>';
+    return '<span class="badge ' + (map[status] || 'badge-muted') + '">' + (status || '—') + '</span>';
   }
 
-  function showMsg(el, msg, isError) {
+  function showMsg(form, msg, isError) {
+    var el = form.querySelector('[data-msg]');
     if (!el) return;
     el.textContent = msg;
-    el.className = isError
-      ? 'form-message form-message--error'
-      : 'form-message form-message--success';
+    el.className = isError ? 'form-message form-message--error' : 'form-message form-message--success';
     el.style.display = 'block';
     setTimeout(function () { el.style.display = 'none'; }, 5000);
   }
 
   function qs(sel) { return document.querySelector(sel); }
   function setText(sel, val) { var el = qs(sel); if (el) el.textContent = val; }
-  function setHTML(sel, val) { var el = qs(sel); if (el) el.innerHTML  = val; }
-  function setVal(sel, val)  { var el = qs(sel); if (el) el.value = val || ''; }
 
-  // Phosphor percent icon — used wherever % would appear in rendered text
-  var pctIcon = '<i class="ph ph-percent" aria-label="%"></i>';
-
-  // ── Modal System ─────────────────────────────────────────────────────────────
-
-  function openModal(id) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    el.classList.add('active');
-    document.body.style.overflow = 'hidden';
-
-    // Populate balance bar in all invest modals
-    var balFmt = _currencySymbol + fmt(_lastBalance);
-    if (id === 'modal-invest-plan') {
-      // Reset select-based form state
-      var sel = document.getElementById('investPlanSelect');
-      if (sel) sel.value = '';
-      var info = document.getElementById('investPlanInfo');
-      var amtGrp = document.getElementById('investPlanAmountGroup');
-      var btn = document.getElementById('investPlanBtn');
-      var msg = document.getElementById('investPlanMsg');
-      if (info)   info.style.display   = 'none';
-      if (amtGrp) amtGrp.style.display = 'none';
-      if (btn)    btn.disabled         = true;
-      if (msg)    msg.style.display    = 'none';
-      var balEl = document.getElementById('investPlanBalance');
-      if (balEl) balEl.textContent = balFmt;
-      // Load plans from cache or fetch
-      if (window._cachedInvestmentPlans && window._cachedInvestmentPlans.length) {
-        populateInvestPlanSelect(window._cachedInvestmentPlans);
-      } else {
-        loadInvestmentsForModal();
-      }
-    } else if (id === 'modal-invest-commodity') {
-      var b = document.getElementById('commodityBalance');
-      if (b) b.textContent = balFmt;
-    } else if (id === 'modal-invest-realestate') {
-      var b2 = document.getElementById('reBalance');
-      if (b2) b2.textContent = balFmt;
+  function copyText(text, cb) {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { cb(true); }).catch(function () { cb(false); });
+    } else {
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.style.cssText = 'position:fixed;top:-9999px;opacity:0';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        var ok = document.execCommand('copy'); document.body.removeChild(ta); cb(ok);
+      } catch (e) { cb(false); }
     }
   }
-
-  async function loadInvestmentsForModal() {
-    var sel = document.getElementById('investPlanSelect');
-    if (sel) {
-      sel.innerHTML = '<option value="">Loading plans…</option>';
-      sel.disabled = true;
-    }
-    try {
-      var r = await apiFetch('/api/user-dashboard/investments.php');
-      if (r.success) {
-        window._cachedInvestmentPlans = r.data.plans || [];
-        populateInvestPlanSelect(window._cachedInvestmentPlans);
-        renderInvPlansPreview(window._cachedInvestmentPlans);
-      } else {
-        if (sel) sel.innerHTML = '<option value="">Failed to load plans</option>';
-      }
-    } catch (e) {
-      if (sel) sel.innerHTML = '<option value="">Network error — try again</option>';
-    } finally {
-      if (sel) sel.disabled = false;
-    }
-  }
-
-  function closeModal(id) {
-    var el = document.getElementById(id);
-    if (!el) return;
-    el.classList.remove('active');
-    // Restore scroll only if no other modals are open
-    if (!document.querySelector('.modal-overlay.active')) {
-      document.body.style.overflow = '';
-    }
-  }
-
-  function closeAllModals() {
-    document.querySelectorAll('.modal-overlay.active').forEach(function (el) {
-      el.classList.remove('active');
-    });
-    document.body.style.overflow = '';
-  }
-
-  // Expose modal functions globally so inline onclick="" handlers work
-  window.openModal      = openModal;
-  window.closeModal     = closeModal;
-  window.closeAllModals = closeAllModals;
-
 
   // ── Toast System ─────────────────────────────────────────────────────────────
 
@@ -226,97 +72,96 @@
     var t = document.createElement('div');
     t.className = 'toast toast--' + (type || 'info');
     t.innerHTML = '<span class="toast-msg">' + msg + '</span>'
-      + '<button class="toast-close" type="button" aria-label="Close notification">'
+      + '<button class="toast-close" type="button" aria-label="Close">'
       + '<i class="ph ph-x"></i></button>';
     t.querySelector('.toast-close').onclick = function () { t.remove(); };
     c.appendChild(t);
     setTimeout(function () { if (t.parentNode) t.remove(); }, 4000);
   }
-
   window.showToast = showToast;
 
-  // ── Global Loader ────────────────────────────────────────────────────────────
+  // ── Loader ───────────────────────────────────────────────────────────────────
 
-  function showLoader() {
-    var l = document.getElementById('globalLoader');
-    if (l) l.classList.add('active');
-  }
-
-  function hideLoader() {
-    var l = document.getElementById('globalLoader');
-    if (l) l.classList.remove('active');
-  }
-
+  function showLoader() { var l = document.getElementById('globalLoader'); if (l) l.classList.add('active'); }
+  function hideLoader() { var l = document.getElementById('globalLoader'); if (l) l.classList.remove('active'); }
   window.showLoader = showLoader;
   window.hideLoader = hideLoader;
 
+  // ── Modal System ─────────────────────────────────────────────────────────────
+
+  function openModal(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal(id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.classList.remove('active');
+    if (!document.querySelector('.modal-overlay.active')) document.body.style.overflow = '';
+  }
+  function closeAllModals() {
+    document.querySelectorAll('.modal-overlay.active').forEach(function (el) { el.classList.remove('active'); });
+    document.body.style.overflow = '';
+  }
+  window.openModal = openModal;
+  window.closeModal = closeModal;
+  window.closeAllModals = closeAllModals;
+
   // ── Module State ─────────────────────────────────────────────────────────────
 
-  var _lastBalance      = 0;  // cache for balance-hide toggle
-  var _rates            = []; // cache for product rates
-  var _ratesFilter      = 'savings'; // active rates tab
+  var _user         = {};       // cached user profile
+  var _currencies   = [];       // all 29 supported assets
+  var _wallets      = [];       // user's wallets with balances
+  var _totalBalance = 0;        // aggregate portfolio USD value
+  var _cardTier     = 'none';   // none | VirtuElevate | VirtuElite
+
+  // ── Crypto Icon URL ──────────────────────────────────────────────────────────
+
+  var _iconOverrides = { XAUT: 'tether-gold', PAXG: 'pax-gold', RLUSD: 'ripple', SFP: 'safepal' };
+
+  function cryptoIconUrl(symbol) {
+    var sym = (symbol || '').toUpperCase();
+    var slug = _iconOverrides[sym] || sym.toLowerCase();
+    return 'https://cdn.jsdelivr.net/gh/nickvdyck/cryptocurrency-icons@master/128/color/' + slug + '.png';
+  }
+
+  // ── Balance Visibility Toggle ────────────────────────────────────────────────
+
+  var _balanceHidden = false;
+
+  function applyBalanceHidden(hidden) {
+    _balanceHidden = hidden;
+    document.querySelectorAll('[data-stat="total-balance"], [data-wallet="balance"]').forEach(function (el) {
+      el.textContent = hidden ? '••••••' : fmt(_totalBalance);
+    });
+    var icon = document.getElementById('balanceToggleIcon');
+    if (icon) icon.className = hidden ? 'ph ph-eye-slash' : 'ph ph-eye';
+  }
 
   // ── Background Refresh ───────────────────────────────────────────────────────
-  //
-  // Two-layer silent refresh — no loading states, no spinners, no flicker:
-  //   • Core timer  (30 s) — updates stats + balance across all sections
-  //   • Section timer (60 s) — re-renders the current section's table data
-  //
-  // Both timers restart whenever the user navigates to a different section.
 
   var _coreTimer    = null;
   var _sectionTimer = null;
   var _activeSection = 'overview';
 
-  // Silently refresh global stats + rates from the dashboard endpoint.
-  // Called every 30 s regardless of which section is visible.
   async function refreshCore() {
     try {
       var r = await apiFetch('/api/user-dashboard/dashboard.php');
       if (!r.success) return;
       var d = r.data;
-
-      // Balance (overview stat card + wallet hero)
-      if (d.currency) initCurrency(d.currency);
-      var balStr = _currencySymbol + fmt(d.balance);
-      setText('[data-stat="balance"]',          balStr);
-      setText('[data-wallet="balance"]',        balStr);
-      _lastBalance = parseFloat(d.balance || 0);
-      applyBalanceHidden(localStorage.getItem('balanceHidden') === '1');
-
-      // Recent transactions (overview table only — not wallet history)
-      var tbody = qs('[data-table="recent-transactions"]');
-      if (tbody && d.recent_transactions) {
-        tbody.innerHTML = d.recent_transactions.length
-          ? d.recent_transactions.map(function (tx) {
-              return '<tr>'
-                + '<td>' + txTypeBadge(tx.type) + '</td>'
-                + '<td>' + _currencySymbol + fmt(tx.amount) + '</td>'
-                + '<td>' + badge(tx.status) + '</td>'
-                + '<td>' + fmtDate(tx.created_at) + '</td>'
-                + '</tr>';
-            }).join('')
-          : '<tr><td colspan="4" class="empty-row">No transactions yet</td></tr>';
+      if (d.user) {
+        _user = d.user;
+        _cardTier = d.user.card_tier || 'none';
+        var name = d.user.full_name || d.user.email || '';
+        document.querySelectorAll('[data-user="name"]').forEach(function (el) { el.textContent = name; });
+        var initial = name.trim().charAt(0).toUpperCase() || 'U';
+        document.querySelectorAll('[data-user="initial"]').forEach(function (el) { el.textContent = initial; });
       }
-
-      // Aggregate investment stat cards
-      setText('[data-stat="inv-total-invested"]', _currencySymbol + fmt(d.total_invested_all || 0));
-      setText('[data-stat="inv-active-count"]',   d.active_count_all || 0);
-      setText('[data-stat="inv-total-returned"]', _currencySymbol + fmt(d.total_expected_all || 0));
-
-      // Update rates cache & re-render if data changed
-      if (d.rates && d.rates.length) {
-        _rates = d.rates;
-        renderRates(_rates, _ratesFilter);
-        populateProductSelects(_rates);
-      }
-      // Refresh market prices silently
-      loadMarketPrices();
-    } catch (e) { /* silent — network blips should not surface to the user */ }
+    } catch (e) { /* silent */ }
   }
 
-  // Silently refresh the current section's detailed table/list data.
-  // Only runs when the user is already looking at that section.
   function refreshSection() {
     var loader = sectionLoaders[_activeSection];
     if (loader) loader();
@@ -324,2054 +169,704 @@
 
   function startBackgroundRefresh(sectionName) {
     _activeSection = sectionName;
-
-    // Core stats — every 30 s
     clearInterval(_coreTimer);
     _coreTimer = setInterval(refreshCore, 30000);
-
-    // Section detail — every 60 s
     clearInterval(_sectionTimer);
     _sectionTimer = setInterval(refreshSection, 60000);
   }
 
-  // ── Dashboard Overview ───────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  //  SECTION LOADERS
+  // ════════════════════════════════════════════════════════════════════════════
 
-  async function loadDashboard() {
+  // ── Overview ─────────────────────────────────────────────────────────────────
+
+  async function loadOverview() {
     try {
+      // 1. User + balance data
       var r = await apiFetch('/api/user-dashboard/dashboard.php');
-      if (!r.success) return;
-      var d = r.data;
-
-      if (d.currency) initCurrency(d.currency);
-      setText('[data-stat="balance"]',           _currencySymbol + fmt(d.balance));
-      _lastBalance = parseFloat(d.balance || 0);
-      applyBalanceHidden(localStorage.getItem('balanceHidden') === '1');
-
-      if (d.user) {
-        var displayName = d.user.full_name || d.user.email || '';
-        document.querySelectorAll('[data-user="name"]').forEach(function (el) {
-          el.textContent = displayName;
-        });
-        // Set avatar initials
-        var initial = displayName.trim().charAt(0).toUpperCase() || 'U';
-        document.querySelectorAll('[data-user="initial"]').forEach(function (el) {
-          el.textContent = initial;
-        });
-      }
-
-      // Cache and render rates
-      if (d.rates && d.rates.length) {
-        _rates = d.rates;
-        renderRates(_rates, _ratesFilter);
-        populateProductSelects(_rates);
-      }
-
-      var tbody = qs('[data-table="recent-transactions"]');
-      if (tbody) {
-        if (d.recent_transactions && d.recent_transactions.length) {
-          tbody.innerHTML = d.recent_transactions.map(function (tx) {
-            return '<tr>'
-              + '<td>' + txTypeBadge(tx.type) + '</td>'
-              + '<td>' + _currencySymbol + fmt(tx.amount) + '</td>'
-              + '<td>' + badge(tx.status) + '</td>'
-              + '<td>' + fmtDate(tx.created_at) + '</td>'
-              + '</tr>';
-          }).join('');
-        } else {
-          tbody.innerHTML = '<tr><td colspan="4" class="empty-row">No transactions yet</td></tr>';
+      if (r.success && r.data) {
+        var d = r.data;
+        if (d.user) {
+          _user = d.user;
+          _cardTier = d.user.card_tier || 'none';
+          var name = d.user.full_name || d.user.email || '';
+          document.querySelectorAll('[data-user="name"]').forEach(function (el) { el.textContent = name; });
+          var initial = name.trim().charAt(0).toUpperCase() || 'U';
+          document.querySelectorAll('[data-user="initial"]').forEach(function (el) { el.textContent = initial; });
         }
       }
-      // Aggregate investment stat cards (all 3 investment types)
-      setText('[data-stat="inv-total-invested"]', _currencySymbol + fmt(d.total_invested_all || 0));
-      setText('[data-stat="inv-active-count"]',   d.active_count_all || 0);
-      setText('[data-stat="inv-total-returned"]', _currencySymbol + fmt(d.total_expected_all || 0));
 
-    } catch (e) {
-      console.error('loadDashboard:', e);
-    }
-
-    // Populate profile fields used in wallet header card on first load
-    loadProfile();
-
-    // Live market prices ticker
-    loadMarketPrices();
-
-    // Portfolio allocation chart
-    renderPortfolioChart();
-  }
-
-  // ── Rates ──────────────────────────────────────────────────────────────────────
-
-  // Modal open action for pricing plan CTA buttons
-  var _productModalMap = {
-    savings:       'modal-create-savings',
-    fixed_deposit: 'modal-fixed-deposit',
-    loan:          'modal-loan'
-  };
-
-  function renderRates(rates, filter) {
-    var grid = document.getElementById('ratesGrid');
-    if (!grid) return;
-    var filtered = rates.filter(function (r) { return r.product === filter; });
-    if (!filtered.length) {
-      grid.innerHTML = '<p class="empty-text">No rates configured for this product.</p>';
-      return;
-    }
-    // Feature the 12-month plan (or the middle plan if none is 12mo)
-    var featuredIdx = filtered.findIndex(function (r) { return parseInt(r.duration_months, 10) === 12; });
-    if (featuredIdx === -1) featuredIdx = Math.floor(filtered.length / 2);
-
-    var ctaLabels = { savings: 'Start Saving', fixed_deposit: 'Open Deposit', loan: 'Apply Now' };
-    var cta = ctaLabels[filter] || 'Get Started';
-    var modalId = _productModalMap[filter] || '';
-
-    grid.innerHTML = filtered.map(function (r, i) {
-      var featured = i === featuredIdx;
-      var cardClass = 'plan-card' + (featured ? ' plan-card--featured' : '');
-      var badge = featured ? '<span class="plan-badge">Popular</span>' : '';
-      return '<div class="' + cardClass + '">'
-        + badge
-        + '<div class="plan-card-name">' + r.label + '</div>'
-        + '<div class="plan-card-duration">' + r.duration_months + ' months</div>'
-        + '<div class="plan-card-rate">' + parseFloat(r.rate).toFixed(2)
-          + '<span><i class="ph ph-percent" aria-label="%"></i>&thinsp;p.a.</span></div>'
-        + (modalId
-          ? '<button class="plan-card-btn" type="button" onclick="openModal(\'' + modalId + '\')">' + cta + '</button>'
-          : '')
-        + '</div>';
-    }).join('');
-  }
-
-  function populateProductSelects(rates) {
-    // Savings modal duration select
-    var savSel = document.getElementById('savingsDuration');
-    if (savSel) {
-      var savRates = rates.filter(function (r) { return r.product === 'savings'; });
-      if (savRates.length) {
-        savSel.innerHTML = savRates.map(function (r) {
-          return '<option value="' + r.duration_months + '" data-rate="' + r.rate + '">'
-            + r.label + ' — ' + r.duration_months + 'mo (' + parseFloat(r.rate).toFixed(2) + '% p.a.)'
-            + '</option>';
-        }).join('');
-        updateSavingsCalc();
+      // 2. Crypto prices + user wallet balances
+      var prices = await apiFetch('/api/utilities/crypto-prices.php');
+      if (prices.success && prices.data) {
+        _currencies = prices.data.currencies || prices.data || [];
       }
-    }
 
-    // Fixed deposit modal plan select
-    var fdSel = document.getElementById('fdPlan');
-    if (fdSel) {
-      var fdRates = rates.filter(function (r) { return r.product === 'fixed_deposit'; });
-      if (fdRates.length) {
-        fdSel.innerHTML = fdRates.map(function (r) {
-          return '<option value="' + r.duration_months + '" data-rate="' + r.rate + '">'
-            + r.label + ' — ' + r.duration_months + 'mo (' + parseFloat(r.rate).toFixed(2) + '% p.a.)'
-            + '</option>';
-        }).join('');
-        updateFdCalc();
-      }
-    }
+      // 3. User wallets
+      try {
+        var w = await apiFetch('/api/user-dashboard/wallet.php');
+        if (w.success && w.data) {
+          _wallets = w.data.wallets || [];
+        }
+      } catch (e) { _wallets = []; }
 
-    // Loan modal plan select
-    var loanSel = document.getElementById('loanPlan');
-    if (loanSel) {
-      var loanRates = rates.filter(function (r) { return r.product === 'loan'; });
-      if (loanRates.length) {
-        loanSel.innerHTML = loanRates.map(function (r) {
-          return '<option value="' + r.duration_months + '" data-rate="' + r.rate + '">'
-            + r.label + ' — ' + r.duration_months + 'mo (' + parseFloat(r.rate).toFixed(2) + '% p.a.)'
-            + '</option>';
-        }).join('');
-        updateLoanCalc();
-      }
-    }
-  }
-
-  // kept for backward compat — no longer used as standalone but harmless
-  function populateSavingsDurationSelect(rates) { populateProductSelects(rates); }
-
-  // ── Live Calculation Helpers ──────────────────────────────────────────────────
-
-  function getSelectedRate(selectId) {
-    var sel = document.getElementById(selectId);
-    if (!sel) return { rate: 0, months: 0 };
-    var opt = sel.options[sel.selectedIndex];
-    if (!opt) return { rate: 0, months: 0 };
-    return {
-      rate:   parseFloat(opt.getAttribute('data-rate') || 0),
-      months: parseInt(opt.value, 10) || 0
-    };
-  }
-
-  function addMonths(date, n) {
-    var d = new Date(date);
-    d.setMonth(d.getMonth() + n);
-    return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
-  }
-
-  function updateSavingsCalc() {
-    var preview  = document.getElementById('savingsCalcPreview');
-    if (!preview) return;
-    var amount   = parseFloat((document.getElementById('savingsTargetAmount') || {}).value) || 0;
-    var plan     = getSelectedRate('savingsDuration');
-    // Store rate in hidden field
-    var hiddenEl = document.getElementById('savingsInterestRate');
-    if (hiddenEl) hiddenEl.value = plan.rate || '';
-
-    if (!amount || !plan.rate) { preview.style.display = 'none'; return; }
-    var interest = amount * (plan.rate / 100) * (plan.months / 12);
-    var total    = amount + interest;
-    preview.style.display = 'block';
-    setText('#savingsCalcPrincipal', _currencySymbol + fmt(amount));
-    setHTML('#savingsCalcRate',      parseFloat(plan.rate).toFixed(2) + pctIcon + '&thinsp;p.a.');
-    setText('#savingsCalcDuration',  plan.months + ' months');
-    setText('#savingsCalcInterest',  '+' + _currencySymbol + fmt(interest));
-    setText('#savingsCalcTotal',     _currencySymbol + fmt(total));
-  }
-
-  function updateFdCalc() {
-    var preview = document.getElementById('fdCalcPreview');
-    if (!preview) return;
-    var amount  = parseFloat((document.getElementById('fdAmount') || {}).value) || 0;
-    var plan    = getSelectedRate('fdPlan');
-
-    if (!amount || !plan.rate) { preview.style.display = 'none'; return; }
-    var interest = amount * (plan.rate / 100) * (plan.months / 12);
-    var total    = amount + interest;
-    preview.style.display = 'block';
-    setText('#fdCalcPrincipal', _currencySymbol + fmt(amount));
-    setText('#fdCalcInterest',  '+' + _currencySymbol + fmt(interest));
-    setText('#fdCalcDuration',  plan.months + ' months');
-    setHTML('#fdCalcRate',      parseFloat(plan.rate).toFixed(2) + pctIcon + '&thinsp;p.a.');
-    setText('#fdCalcTotal',     _currencySymbol + fmt(total));
-    setText('#fdCalcMaturity',  addMonths(new Date(), plan.months));
-  }
-
-  function updateLoanCalc() {
-    var preview = document.getElementById('loanCalcPreview');
-    if (!preview) return;
-    var principal = parseFloat((document.getElementById('loanAmountInput') || {}).value) || 0;
-    var plan      = getSelectedRate('loanPlan');
-
-    if (!principal || !plan.rate) { preview.style.display = 'none'; return; }
-    var monthlyRate = plan.rate / 100 / 12;
-    var n           = plan.months;
-    var monthly, totalRepayable, totalInterest;
-    if (monthlyRate === 0) {
-      monthly       = principal / n;
-      totalRepayable = principal;
-      totalInterest  = 0;
-    } else {
-      monthly       = principal * (monthlyRate * Math.pow(1 + monthlyRate, n)) / (Math.pow(1 + monthlyRate, n) - 1);
-      totalRepayable = monthly * n;
-      totalInterest  = totalRepayable - principal;
-    }
-    preview.style.display = 'block';
-    setText('#loanCalcPrincipal', _currencySymbol + fmt(principal));
-    setText('#loanCalcMonthly',   _currencySymbol + fmt(monthly));
-    setText('#loanCalcDuration',  n + ' months');
-    setHTML('#loanCalcRate',      parseFloat(plan.rate).toFixed(2) + pctIcon + '&thinsp;p.a.');
-    setText('#loanCalcInterest',  _currencySymbol + fmt(totalInterest));
-    setText('#loanCalcTotal',     _currencySymbol + fmt(totalRepayable));
-  }
-
-  // ── NOWPayments Auto-Verify ───────────────────────────────────────────────────
-
-  var _paymentPollCount  = 0;
-  var _paymentPollMax    = 8;   // max 8 attempts (~40 seconds)
-  var _paymentPollTimer  = null;
-
-  async function checkPendingPayment(invoiceId, attempt) {
-    attempt = attempt || 0;
-    if (attempt >= _paymentPollMax) return;
-
-    try {
-      var r = await apiFetch('/api/payments/now-payment-status.php', {
-        method: 'POST',
-        body: JSON.stringify({ invoice_id: invoiceId })
+      // 4. Calculate total balance
+      _totalBalance = 0;
+      _wallets.forEach(function (wallet) {
+        var bal = parseFloat(wallet.balance || 0);
+        var cur = _currencies.find(function (c) {
+          return c.symbol === wallet.symbol || c.id == wallet.currency_id;
+        });
+        var price = cur ? parseFloat(cur.current_price_usd || cur.price || 0) : 0;
+        _totalBalance += bal * price;
       });
 
-      if (r.success && r.status === 'completed') {
-        try { sessionStorage.removeItem('np_invoice_id'); } catch(e) {}
-        if (r.credited) {
-          showToast('Payment confirmed! Your wallet has been credited.', 'success');
-        }
-        loadWallet();
-        loadDashboard();
-        return;
-      }
+      setText('[data-stat="total-balance"]', fmt(_totalBalance));
+      applyBalanceHidden(_balanceHidden);
 
-      if (r.success && (r.status === 'failed')) {
-        try { sessionStorage.removeItem('np_invoice_id'); } catch(e) {}
-        showToast('Payment failed or expired. Please try again.', 'error');
-        return;
-      }
-
-      // Still pending — retry with exponential back-off (5s, 5s, 10s, 10s …)
-      var delay = attempt < 2 ? 5000 : 10000;
-      _paymentPollTimer = setTimeout(function () {
-        checkPendingPayment(invoiceId, attempt + 1);
-      }, delay);
+      // 5. Render asset list
+      renderAssetList();
 
     } catch (e) {
-      // Network error — try again once more
-      if (attempt < 2) {
-        _paymentPollTimer = setTimeout(function () {
-          checkPendingPayment(invoiceId, attempt + 1);
-        }, 5000);
-      }
+      console.error('loadOverview:', e);
     }
   }
 
-  // ── Wallet ────────────────────────────────────────────────────────────────────
+  function renderAssetList() {
+    var container = document.getElementById('assetList');
+    if (!container) return;
 
-  // Withdrawal fee cached from last wallet load
-  var _withdrawalFee = 0;
-
-  // Banks by country for bank transfer modal
-  var _banksByCountry = {
-    "United States":  ["JPMorgan Chase Bank","Bank of America","Wells Fargo","Citibank","U.S. Bank","Truist Bank","PNC Bank","Capital One","TD Bank","Goldman Sachs Bank USA","Morgan Stanley Bank","BMO Harris Bank","Fifth Third Bank","Citizens Bank","Ally Bank"],
-    "Germany":        ["Deutsche Bank","Commerzbank","Postbank","HypoVereinsbank (UniCredit Bank AG)","DZ Bank","KfW (Kreditanstalt für Wiederaufbau)","Sparkasse","Volksbanken und Raiffeisenbanken","Berenberg Bank","Bankhaus Lampe"],
-    "France":         ["BNP Paribas","Crédit Agricole","Société Générale","BPCE (Banque Populaire and Caisse d'Epargne)","Crédit Mutuel","La Banque Postale","HSBC France","CIC (Crédit Industriel et Commercial)"],
-    "United Kingdom": ["HSBC","Barclays","Lloyds Banking Group","NatWest Group","Standard Chartered","Santander UK","Nationwide Building Society","TSB Bank"],
-    "Italy":          ["UniCredit","Intesa Sanpaolo","Banco BPM","Monte dei Paschi di Siena","UBI Banca","Mediobanca","Banca Nazionale del Lavoro (BNL)","Cassa Depositi e Prestiti (CDP)"],
-    "Spain":          ["Banco Santander","BBVA (Banco Bilbao Vizcaya Argentaria)","CaixaBank","Bankia","Sabadell","Bankinter","Kutxabank","Abanca"],
-    "Netherlands":    ["ING Bank","Rabobank","ABN AMRO","De Nederlandsche Bank (DNB)","SNS Bank","F. van Lanschot Bankiers","Achmea Bank","KAS BANK"],
-    "Sweden":         ["Nordea","SEB (Skandinaviska Enskilda Banken)","Swedbank","Handelsbanken","Länsförsäkringar Bank","SBAB Bank","Ikano Bank"],
-    "Switzerland":    ["UBS","Credit Suisse","Raiffeisen Switzerland","Zürcher Kantonalbank (ZKB)","Julius Baer","Pictet & Cie","PostFinance","Banque Cantonale Vaudoise (BCV)"],
-    "Poland":         ["PKO Bank Polski","Bank Pekao","Santander Bank Polska","mBank","ING Bank Śląski","Bank Millennium","Alior Bank","Getinormen Bank"],
-    "Austria":        ["Erste Group Bank","Raiffeisen Bank International","BAWAG P.S.K.","UniCredit Bank Austria","Oberbank","Volksbank Wien","Sberbank Europe","Kathrein & Co. Privatgeschäftsbank"],
-    "Greece":         ["National Bank of Greece","Piraeus Bank","Alpha Bank","Eurobank","Attica Bank","HSBC Greece","Pancreta Bank","Optima Bank"],
-    "Portugal":       ["Caixa Geral de Depósitos","Millennium BCP (Banco Comercial Português)","Banco BPI","Novo Banco","Santander Totta","Montepio","Crédito Agrícola","Banco Mais"],
-    "Norway":         ["DNB Bank","Nordea Bank Norge","SpareBank 1 Group","Handelsbanken Norge","Danske Bank Norway","Storebrand Bank","Santander Consumer Bank","Sparebanken Vest"],
-    "Denmark":        ["Danske Bank","Nordea Bank Danmark","Jyske Bank","Sydbank","Nykredit Bank","Spar Nord Bank","Arbejdernes Landsbank","Saxo Bank"],
-    "Belgium":        ["KBC Bank","BNP Paribas Fortis","ING Belgium","Belfius Bank","Argenta","Bank J. Van Breda en Co","AXA Bank Belgium","Crelan"],
-    "Finland":        ["Nordea Bank Finland","OP Financial Group","Danske Bank Finland","S-Pankki (S-Bank)","Aktia Bank","Bank of Åland","Handelsbanken Finland","Oma Savings Bank"],
-    "Ireland":        ["Bank of Ireland","Allied Irish Banks (AIB)","Ulster Bank","Permanent TSB","KBC Bank Ireland","Citibank Europe","Danske Bank Ireland","Bank of America Europe"],
-    "Czech Republic": ["ČSOB (Československá Obchodní Banka)","Česká Spořitelna","Komerční Banka","UniCredit Bank Czech Republic","Raiffeisenbank Czech Republic","MONETA Money Bank","Air Bank","Fio Banka"],
-    "Hungary":        ["OTP Bank","K&H Bank","Erste Bank Hungary","UniCredit Bank Hungary","Raiffeisen Bank Hungary","CIB Bank","MKB Bank","Budapest Bank"],
-    "Ukraine":        ["PrivatBank","Oschadbank","Ukrgasbank","Raiffeisen Bank Aval","Ukrsibbank","Sense Bank","PUMB (First Ukrainian International Bank)","UkrEximBank"]
-  };
-
-  // ── Withdraw modal tab + bank dropdown logic ────────────────────────────────
-  document.addEventListener('click', function (e) {
-    var tab = e.target.closest('[data-withdraw-tab]');
-    if (!tab) return;
-    var method = tab.dataset.withdrawTab;
-
-    // Update hidden input
-    var form = document.querySelector('#modal-withdraw form[data-action="withdraw"]');
-    if (form) {
-      var methodInput = form.querySelector('[name="withdrawal_method"]');
-      if (methodInput) methodInput.value = method;
-    }
-
-    // Toggle tab active class (CSS handles all styling)
-    document.querySelectorAll('[data-withdraw-tab]').forEach(function (t) {
-      t.classList.toggle('active', t.dataset.withdrawTab === method);
-    });
-
-    // Show/hide sections
-    var cryptoSection = document.getElementById('withdrawCryptoSection');
-    var bankSection   = document.getElementById('withdrawBankSection');
-    if (cryptoSection) cryptoSection.style.display = method === 'crypto' ? '' : 'none';
-    if (bankSection)   bankSection.style.display   = method === 'bank'   ? '' : 'none';
-  });
-
-  // Country → bank dropdown
-  document.addEventListener('change', function (e) {
-    var countrySelect = e.target.closest('#withdrawBankCountry');
-    if (!countrySelect) return;
-    var country   = countrySelect.value;
-    var bankSelect = document.getElementById('withdrawBankName');
-    if (!bankSelect) return;
-    bankSelect.innerHTML = '';
-    if (!country || !_banksByCountry[country]) {
-      bankSelect.innerHTML = '<option value="">Select a country first</option>';
-      bankSelect.disabled  = true;
-      return;
-    }
-    var opts = '<option value="">Select a bank</option>';
-    _banksByCountry[country].forEach(function (b) {
-      opts += '<option value="' + b.replace(/"/g, '&quot;') + '">' + b + '</option>';
-    });
-    bankSelect.innerHTML = opts;
-    bankSelect.disabled  = false;
-
-    // Show/hide sort code for UK
-    var sortGroup = document.getElementById('withdrawSortCodeGroup');
-    if (sortGroup) sortGroup.style.display = country === 'United Kingdom' ? '' : 'none';
-  });
-
-  // Fee display on amount input
-  document.addEventListener('input', function (e) {
-    var amountInput = e.target.closest('#withdrawAmount');
-    if (!amountInput) return;
-    var feeNote = document.getElementById('withdrawFeeNote');
-    if (!feeNote) return;
-    var amt = parseFloat(amountInput.value) || 0;
-    if (_withdrawalFee > 0 && amt > 0) {
-      feeNote.style.display = '';
-      feeNote.textContent   = 'Withdrawal fee: $' + fmt(_withdrawalFee)
-        + ' · Total deducted from wallet: $' + fmt(amt + _withdrawalFee);
-    } else if (_withdrawalFee > 0) {
-      feeNote.style.display = '';
-      feeNote.textContent   = 'Withdrawal fee: $' + fmt(_withdrawalFee);
-    } else {
-      feeNote.style.display = 'none';
-    }
-  });
-
-  // ── Transaction Pagination ────────────────────────────────────────────────────
-  var _allTransactions = [];
-  var _txPage    = 1;
-  var _txPerPage = 10;
-
-  function renderTxPage() {
-    var tbody = document.getElementById('txTableBody');
-    if (!tbody) return;
-    if (!_allTransactions.length) {
-      tbody.innerHTML = '<tr><td colspan="5" class="empty-row">No transactions yet</td></tr>';
-      return;
-    }
-    var start = (_txPage - 1) * _txPerPage;
-    var page  = _allTransactions.slice(start, start + _txPerPage);
-    tbody.innerHTML = page.map(function (tx) {
-      return '<tr>'
-        + '<td>' + txTypeBadge(tx.type) + '</td>'
-        + '<td>' + _currencySymbol + fmt(tx.amount) + '</td>'
-        + '<td>' + badge(tx.status) + '</td>'
-        + '<td>' + (tx.notes || '--') + '</td>'
-        + '<td>' + fmtDate(tx.created_at) + '</td>'
-        + '</tr>';
-    }).join('');
-  }
-
-  function renderTxPagination() {
-    var el = document.getElementById('txPagination');
-    if (!el) return;
-    var totalPages = Math.ceil(_allTransactions.length / _txPerPage);
-    if (totalPages <= 1) { el.innerHTML = ''; return; }
-    var html = '<div class="tx-pag-inner">';
-    html += '<button class="tx-pag-btn" onclick="txGoPage(' + (_txPage - 1) + ')" '
-      + (_txPage === 1 ? 'disabled' : '') + '>'
-      + '<i class="ph ph-caret-left"></i></button>';
-    for (var i = 1; i <= totalPages; i++) {
-      html += '<button class="tx-pag-btn' + (i === _txPage ? ' tx-pag-btn--active' : '')
-        + '" onclick="txGoPage(' + i + ')">' + i + '</button>';
-    }
-    html += '<button class="tx-pag-btn" onclick="txGoPage(' + (_txPage + 1) + ')" '
-      + (_txPage === totalPages ? 'disabled' : '') + '>'
-      + '<i class="ph ph-caret-right"></i></button>';
-    html += '</div><span class="tx-pag-info">'
-      + (_allTransactions.length) + ' transactions</span>';
-    el.innerHTML = html;
-  }
-
-  window.txGoPage = function (page) {
-    var totalPages = Math.ceil(_allTransactions.length / _txPerPage);
-    if (page < 1 || page > totalPages) return;
-    _txPage = page;
-    renderTxPage();
-    renderTxPagination();
-  };
-
-  window.exportTransactionsCSV = function () {
-    if (!_allTransactions.length) return showToast('No transactions to export', 'info');
-    var header = ['Type','Amount','Status','Description','Date'];
-    var rows = _allTransactions.map(function (tx) {
-      return [
-        (tx.type || '').replace(/_/g, ' '),
-        parseFloat(tx.amount || 0).toFixed(2),
-        tx.status || '',
-        (tx.notes || '').replace(/,/g, ' '),
-        fmtDate(tx.created_at)
-      ].join(',');
-    });
-    var csv  = [header.join(',')].concat(rows).join('\n');
-    var blob = new Blob([csv], { type: 'text/csv' });
-    var url  = URL.createObjectURL(blob);
-    var a    = document.createElement('a');
-    a.href     = url;
-    a.download = 'qblockx-transactions.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    showToast('Transactions exported', 'success');
-  };
-
-  async function loadWallet() {
-    // Populate wallet-info-card fields that come from profile data
-    loadProfile();
-
-    try {
-      var r = await apiFetch('/api/user-dashboard/wallet.php');
-      if (!r.success) return;
-      var d = r.data;
-
-      if (d.currency) initCurrency(d.currency);
-      _lastBalance    = parseFloat(d.balance || 0);
-      _withdrawalFee  = parseFloat(d.withdrawal_fee || 0);
-
-      setText('[data-wallet="balance"]', _currencySymbol + fmt(_lastBalance));
-      applyBalanceHidden(localStorage.getItem('balanceHidden') === '1');
-
-      // Paginated transaction history
-      _allTransactions = d.transactions || [];
-      _txPage = 1;
-      renderTxPage();
-      renderTxPagination();
-
-      var wdList = qs('[data-list="withdrawals"]');
-      if (wdList) {
-        if (d.withdrawals && d.withdrawals.length) {
-          wdList.innerHTML = d.withdrawals.map(function (w) {
-            return '<div class="withdrawal-item">'
-              + '<span>' + _currencySymbol + fmt(w.amount) + '</span>'
-              + badge(w.status)
-              + '<span>' + fmtDate(w.created_at) + '</span>'
-              + '</div>';
-          }).join('');
-        } else {
-          wdList.innerHTML = '<p class="empty-text">No withdrawal requests</p>';
-        }
-      }
-    } catch (e) {
-      console.error('loadWallet:', e);
-    }
-
-    // Load trust wallet linked state
-    try {
-      var twR = await apiFetch('/api/user-dashboard/trust-wallet.php');
-      if (twR && twR.success) updateTrustWalletCard(twR.data);
-    } catch (e) { /* non-critical */ }
-  }
-
-  function updateTrustWalletCard(data) {
-    var unlinked = document.getElementById('trustWalletUnlinked');
-    var linked   = document.getElementById('trustWalletLinked');
-    if (!unlinked || !linked) return;
-
-    var wallets  = (data && data.wallets) ? data.wallets : [];
-    var count    = wallets.length;
-
-    if (count > 0) {
-      unlinked.style.display = 'none';
-      linked.style.display   = '';
-
-      var countBadge = document.getElementById('twLinkedCount');
-      if (countBadge) countBadge.textContent = count + '/5 Active';
-
-      var first  = wallets[0];
-      var nameEl = document.getElementById('twLinkedName');
-      var addrEl = document.getElementById('twLinkedAddr');
-      if (nameEl) nameEl.textContent = (count === 1 ? (first.wallet_name || 'Linked Wallet') : count + ' wallets linked');
-      if (addrEl && first.wallet_address) {
-        var addr = first.wallet_address;
-        addrEl.textContent = addr.length > 16 ? addr.slice(0, 8) + '…' + addr.slice(-6) : addr;
-      } else if (addrEl) {
-        addrEl.textContent = first.has_phrase ? 'Recovery phrase stored' : '';
-      }
-
-      // Disable "Link Another" when at max
-      var addBtn = document.getElementById('twLinkAnotherBtn');
-      if (addBtn) addBtn.disabled = count >= 5;
-
-      // Populate the linked-wallets modal list
-      renderLinkedWalletsList(wallets);
-    } else {
-      unlinked.style.display = '';
-      linked.style.display   = 'none';
-    }
-  }
-
-  function renderLinkedWalletsList(wallets) {
-    var list = document.getElementById('linkedWalletsList');
-    if (!list) return;
-    var addBtn = document.getElementById('linkedWalletsAddBtn');
-    if (addBtn) addBtn.disabled = wallets.length >= 5;
-
-    if (!wallets.length) {
-      list.innerHTML = '<p class="empty-text">No wallets linked yet.</p>';
+    if (!_currencies.length) {
+      container.innerHTML = '<div class="empty-state"><i class="ph ph-coin" aria-hidden="true"></i>'
+        + '<p>No assets loaded</p></div>';
       return;
     }
 
-    list.innerHTML = wallets.map(function (w) {
-      var addr = w.wallet_address
-        ? (w.wallet_address.length > 20 ? w.wallet_address.slice(0, 10) + '…' + w.wallet_address.slice(-8) : w.wallet_address)
-        : (w.has_phrase ? 'Recovery phrase stored' : '—');
-      return '<div class="linked-wallet-row">'
-        + '<div class="linked-wallet-avatar"><i class="ph ph-wallet"></i></div>'
-        + '<div class="linked-wallet-info">'
-        + '<div class="linked-wallet-name">' + (w.wallet_name || 'Wallet') + '</div>'
-        + '<div class="linked-wallet-addr">' + addr + '</div>'
+    var html = '';
+    _currencies.forEach(function (cur) {
+      var symbol   = cur.symbol || '';
+      var name     = cur.name || symbol;
+      var network  = cur.network || '';
+      var price    = parseFloat(cur.current_price_usd || cur.price || 0);
+      var change   = parseFloat(cur.price_change_24h_pct || cur.change_24h || 0);
+      var isNew    = cur.is_new == 1 || cur.is_new === true;
+      var isPopular = cur.is_popular == 1 || cur.is_popular === true;
+
+      // Find user's wallet for this asset
+      var wallet = _wallets.find(function (w) {
+        return (w.symbol === symbol && w.network === network) || w.currency_id == cur.id;
+      });
+      var balance = wallet ? parseFloat(wallet.balance || 0) : 0;
+      var holdingUsd = balance * price;
+
+      var changeClass = change >= 0 ? 'asset-change--up' : 'asset-change--down';
+      var changePrefix = change >= 0 ? '+' : '';
+
+      var badgeHtml = '';
+      if (isNew) badgeHtml = '<span class="asset-badge asset-badge--new">New</span>';
+      else if (isPopular) badgeHtml = '<span class="asset-badge asset-badge--popular">Popular</span>';
+
+      var displayName = name;
+      if (network && network !== symbol && network !== 'Bitcoin' && network !== 'Litecoin'
+          && network !== 'Dogecoin' && network !== 'Bitcoin Cash') {
+        displayName = name + ' (' + network + ')';
+      }
+
+      html += '<div class="asset-row" data-symbol="' + symbol + '" data-network="' + network + '">'
+        + '<div class="asset-row-left">'
+        + '<img class="asset-icon" src="' + cryptoIconUrl(symbol) + '" alt="' + symbol + '" '
+        + 'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';">'
+        + '<div class="asset-icon-fallback" style="display:none;">' + symbol.substring(0, 3) + '</div>'
+        + '<div class="asset-name-col">'
+        + '<span class="asset-name">' + displayName + '</span>'
+        + '<span class="asset-symbol">' + symbol + '</span>'
+        + '</div></div>'
+        + '<div class="asset-row-center">'
+        + '<span class="asset-price">$' + fmt(price, price < 1 ? 6 : 2) + '</span>'
+        + '<span class="asset-change ' + changeClass + '">' + changePrefix + change.toFixed(2) + '%</span>'
         + '</div>'
-        + '<button class="btn-xs btn-outline" style="flex-shrink:0;color:var(--color-error,#ef4444);" onclick="removeLinkedWallet(' + w.id + ')" title="Remove">'
-        + '<i class="ph ph-trash"></i></button>'
+        + '<div class="asset-row-right">'
+        + '<span class="asset-holding-usd">$' + fmt(holdingUsd) + '</span>'
+        + '<span class="asset-holding-native">' + fmtCrypto(balance) + ' ' + symbol + '</span>'
+        + '</div>'
+        + badgeHtml
+        + '</div>';
+    });
+
+    container.innerHTML = html;
+    var countEl = document.getElementById('assetCount');
+    if (countEl) countEl.textContent = _currencies.length + ' assets';
+  }
+
+  // ── Connect Wallet ───────────────────────────────────────────────────────────
+
+  var _walletProviders = [
+    'MetaMask','Trust Wallet','Coinbase Wallet','Ledger','Rainbow','Phantom',
+    'Exodus','SafePal','TokenPocket','Bitget Wallet','OKX Wallet','Zerion',
+    'Rabby','imToken','Brave Wallet','Argent','Uniswap Wallet','1inch Wallet',
+    'MathWallet','Coin98','Guarda','Atomic Wallet','Unstoppable Wallet',
+    'Infinity Wallet','Enkrypt','Taho','Frame','Ambire','Sequence','XDEFI',
+    'Frontier','Omni','Backpack','Zeal','Fireblocks','Kraken Wallet','Binance Web3',
+    'BitKeep','Trezor','Keystone','Jade Wallet','CoolWallet','D\'Cent','Ballet',
+    'Tangem','SecuX','BC Vault','Ellipal','NGRAVE','Klever Wallet','Keplr',
+    'Leap','Cosmostation','OsmosisZone','Solflare','Glow','Blade','HashPack',
+    'Pera','Defly','MyAlgo','AlgoSigner','Temple','Kukai','Nami','Eternl',
+    'Flint','Yoroi','GameStop Wallet','Ronin Wallet','Petra','Pontem','Martian',
+    'Suiet','Ethos','Core','Mysten Wallet','ZenGo','Firefly','TangemNote',
+    'SafeHeron','Loopring','AirGap','Gnosis Safe','Torus','Portis','Blocto',
+    'WalletConnect','Fortmatic','Magic Link','Web3Auth','Particle','Privy',
+    'Dynamic','Thirdweb','RainbowKit','Wagmi','Venly','Bitski','Crossmint',
+    'Paper','Stardust','Halliday','Openfort','Patch','Obvious','Family',
+    'Slingshot','Liquality','ONTO','Bitpie','Mobox','Vision','Huobi Wallet',
+    'Gate Wallet','MEXC Wallet','Bybit Wallet','KuCoin Wallet','Crypto.com',
+    'BlockFi','Nexo','Celsius','Aave','Compound','Lido','Rocket Pool',
+    'Ankr','Stakewise','Marinade','Jito','Blazestake','Jupiter','Raydium',
+    'Orca','Serum','Drift','Mango','Tensor','Magic Eden','OpenSea',
+    'LooksRare','Blur','Foundation','Zora','Manifold','NiftyGateway',
+    'SuperRare','Async Art','Catalog','Sound','Audius','Lens','Farcaster',
+    'Mirror','Paragraph','Degen','Friend.tech','Penpot','Thirdweb Gate',
+    'Lit Protocol','DIMO','Helium','Hivemapper','Render','Akash',
+    'Filecoin Wallet','Arweave','Ceramic','IPFS','The Graph',
+    'Chainlink','Band Protocol','API3','Pyth','Switchboard',
+    'Wormhole','LayerZero','Axelar','Celer','Multichain',
+    'Synapse','Stargate','Hop','Across','Connext','Socket',
+    'Biconomy','Gelato','Chainstack','Alchemy','Infura',
+    'QuickNode','Moralis','Covalent','Dune','DeBank',
+    'Zapper','Zerion Dashboard'
+  ];
+
+  function loadConnectWallet() {
+    var grid = document.getElementById('walletProviderGrid');
+    if (!grid) return;
+    renderWalletProviders('');
+
+    // Search filter
+    var search = document.getElementById('walletProviderSearch');
+    if (search && !search._bound) {
+      search._bound = true;
+      search.addEventListener('input', function () {
+        renderWalletProviders(this.value.trim().toLowerCase());
+      });
+    }
+  }
+
+  function renderWalletProviders(filter) {
+    var grid = document.getElementById('walletProviderGrid');
+    if (!grid) return;
+    var providers = _walletProviders.filter(function (p) {
+      return !filter || p.toLowerCase().indexOf(filter) !== -1;
+    });
+    if (!providers.length) {
+      grid.innerHTML = '<div class="empty-state"><p>No wallets match your search</p></div>';
+      return;
+    }
+    grid.innerHTML = providers.map(function (name) {
+      var initial = name.charAt(0).toUpperCase();
+      return '<div class="wallet-provider-card" data-provider="' + name + '">'
+        + '<div class="asset-icon-fallback" style="display:flex;width:4rem;height:4rem;font-size:1.6rem;">' + initial + '</div>'
+        + '<span>' + name + '</span>'
         + '</div>';
     }).join('');
   }
 
-  window.removeLinkedWallet = async function (walletId) {
-    if (!confirm('Remove this linked wallet?')) return;
-    try {
-      var r = await apiFetch('/api/user-dashboard/trust-wallet.php', {
-        method: 'DELETE',
-        body: JSON.stringify({ id: walletId })
-      });
-      if (r && r.success) {
-        showToast('Wallet removed.', 'success');
-        var twR = await apiFetch('/api/user-dashboard/trust-wallet.php');
-        if (twR && twR.success) updateTrustWalletCard(twR.data);
-      } else {
-        showToast((r && r.message) || 'Failed to remove wallet.', 'error');
-      }
-    } catch (e) {
-      showToast('Network error. Please try again.', 'error');
-    }
-  };
+  // ── Send ─────────────────────────────────────────────────────────────────────
 
-  function applyBalanceHidden(hidden) {
-    var el   = qs('[data-wallet="balance"]');
-    var icon = document.getElementById('balanceToggleIcon');
-    if (el)   el.textContent = hidden ? '••••••' : (_currencySymbol + fmt(_lastBalance));
-    if (icon) icon.className = hidden ? 'ph ph-eye-slash' : 'ph ph-eye';
-  }
-
-  async function initiateDeposit(form) {
-    var btn      = form.querySelector('[type="submit"]');
-    var msgEl    = form.querySelector('[data-msg]');
-    var amountEl = form.querySelector('[name="amount"]');
-    var currEl   = form.querySelector('[name="currency"]');
-    var amount   = amountEl ? amountEl.value : '';
-    var currency = currEl   ? currEl.value   : 'usdttrc20';
-
-    if (!amount || parseFloat(amount) <= 0) {
-      return showMsg(msgEl, 'Please enter a valid deposit amount', true);
-    }
-
-    btn.disabled = true;
-    btn.innerHTML = '<i class="ph ph-circle-notch ph-spin"></i> Processing…';
-
-    try {
-      var r = await apiFetch('/api/payments/now-payment-initiate.php', {
-        method: 'POST',
-        body: JSON.stringify({ amount: parseFloat(amount), currency: currency })
-      });
-
-      if (r.success && r.data && r.data.invoice_url) {
-        showMsg(msgEl, 'Redirecting to secure payment page…', false);
-        // Persist invoice_id so we can poll for confirmation when the user returns
-        try { sessionStorage.setItem('np_invoice_id', r.data.invoice_id); } catch(e) {}
-        setTimeout(function () { window.location.href = r.data.invoice_url; }, 800);
-      } else {
-        showMsg(msgEl, r.message || 'Failed to create payment. Please try again.', true);
-        btn.disabled = false;
-        btn.innerHTML = '<i class="ph ph-arrow-right"></i> Continue to Payment';
-      }
-    } catch (e) {
-      showMsg(msgEl, 'Network error. Please check your connection and try again.', true);
-      btn.disabled = false;
-      btn.innerHTML = '<i class="ph ph-arrow-right"></i> Continue to Payment';
-    }
-  }
-
-  async function submitWithdrawal(form) {
-    var btn    = form.querySelector('[type="submit"]');
-    var msgEl  = form.querySelector('[data-msg]');
-    var method = (form.querySelector('[name="withdrawal_method"]') || {}).value || 'crypto';
-    var amount = (form.querySelector('[name="amount"]') || {}).value || '';
-
-    if (!amount || parseFloat(amount) <= 0) return showMsg(msgEl, 'Enter a valid amount', true);
-
-    var payload = {
-      withdrawal_method: method,
-      amount: parseFloat(amount)
-    };
-
-    if (method === 'bank') {
-      var country  = (form.querySelector('[name="bank_country"]')         || {}).value || '';
-      var bankName = (form.querySelector('[name="bank_name"]')            || {}).value || '';
-      var holder   = (form.querySelector('[name="account_holder_name"]')  || {}).value || '';
-      var iban     = (form.querySelector('[name="iban"]')                 || {}).value || '';
-      var bic      = (form.querySelector('[name="bic_swift"]')            || {}).value || '';
-      var sort     = (form.querySelector('[name="sort_code"]')            || {}).value || '';
-      var cur      = (form.querySelector('[name="bank_currency"]')        || {}).value || 'EUR';
-      var txref    = (form.querySelector('[name="transaction_reference"]') || {}).value || '';
-
-      if (!country)  return showMsg(msgEl, 'Please select a country', true);
-      if (!bankName) return showMsg(msgEl, 'Please select a bank', true);
-      if (!holder.trim()) return showMsg(msgEl, 'Account holder name is required', true);
-      if (!iban.trim())   return showMsg(msgEl, 'IBAN is required', true);
-      if (!bic.trim())    return showMsg(msgEl, 'BIC/SWIFT code is required', true);
-
-      payload.bank_country          = country;
-      payload.bank_name             = bankName;
-      payload.account_holder_name   = holder.trim();
-      payload.iban                  = iban.trim();
-      payload.bic_swift             = bic.trim();
-      payload.sort_code             = sort.trim();
-      payload.bank_currency         = cur.trim().toUpperCase() || 'EUR';
-      payload.transaction_reference = txref.trim();
+  function loadSend() {
+    // Check card status
+    var gate = document.getElementById('sendGateBanner');
+    var form = document.getElementById('sendFormWrap');
+    if (_cardTier !== 'none') {
+      if (gate) gate.style.display = 'none';
+      if (form) form.style.display = 'block';
     } else {
-      var currency = (form.querySelector('[name="currency"]')      || {}).value || 'usdttrc20';
-      var address  = (form.querySelector('[name="wallet_address"]') || {}).value || '';
-      if (!address.trim()) return showMsg(msgEl, 'Wallet address is required', true);
-      payload.currency       = currency;
-      payload.wallet_address = address.trim();
+      if (gate) gate.style.display = 'flex';
+      if (form) form.style.display = 'none';
+    }
+    populateAssetSelect('sendAsset');
+    bindSendTypeToggle();
+  }
+
+  function bindSendTypeToggle() {
+    var radios = document.querySelectorAll('[name="send_type"]');
+    var addrGrp = document.getElementById('sendAddressGroup');
+    var userGrp = document.getElementById('sendUsernameGroup');
+    radios.forEach(function (r) {
+      if (r._bound) return;
+      r._bound = true;
+      r.addEventListener('change', function () {
+        if (this.value === 'address') {
+          if (addrGrp) addrGrp.style.display = 'block';
+          if (userGrp) userGrp.style.display = 'none';
+        } else {
+          if (addrGrp) addrGrp.style.display = 'none';
+          if (userGrp) userGrp.style.display = 'block';
+        }
+      });
+    });
+
+    // MAX button
+    var maxBtn = document.getElementById('sendMaxBtn');
+    if (maxBtn && !maxBtn._bound) {
+      maxBtn._bound = true;
+      maxBtn.addEventListener('click', function () {
+        var sel = document.getElementById('sendAsset');
+        if (!sel || !sel.value) return;
+        var wallet = _wallets.find(function (w) { return w.currency_id == sel.value || w.id == sel.value; });
+        if (wallet) document.getElementById('sendAmount').value = wallet.balance;
+      });
     }
 
-    btn.disabled = true;
-    btn.textContent = 'Submitting…';
-
-    try {
-      var r = await apiFetch('/api/user-dashboard/wallet.php', {
-        method: 'POST',
-        body: JSON.stringify(payload)
+    // Update available balance on asset change
+    var sel = document.getElementById('sendAsset');
+    if (sel && !sel._bound) {
+      sel._bound = true;
+      sel.addEventListener('change', function () {
+        var wallet = _wallets.find(function (w) { return w.currency_id == this.value || w.id == this.value; }.bind(this));
+        var hint = document.getElementById('sendAvailable');
+        if (hint) hint.textContent = 'Available: ' + fmtCrypto(wallet ? wallet.balance : 0);
       });
-
-      if (r.success) {
-        showMsg(msgEl, r.message || 'Withdrawal request submitted. Processing in 24–48 hours.', false);
-        form.reset();
-        // Reset tabs back to crypto
-        document.querySelectorAll('[data-withdraw-tab]').forEach(function (t) {
-          t.classList.toggle('active', t.dataset.withdrawTab === 'crypto');
-        });
-        var cryptoSection = document.getElementById('withdrawCryptoSection');
-        var bankSection   = document.getElementById('withdrawBankSection');
-        if (cryptoSection) cryptoSection.style.display = '';
-        if (bankSection)   bankSection.style.display   = 'none';
-        var methodInput = form.querySelector('[name="withdrawal_method"]');
-        if (methodInput) methodInput.value = 'crypto';
-        loadWallet();
-        setTimeout(function () { closeModal('modal-withdraw'); }, 2000);
-        showToast('Withdrawal request submitted!', 'success');
-      } else {
-        showMsg(msgEl, r.message || 'Withdrawal failed. Please try again.', true);
-      }
-    } catch (e) {
-      showMsg(msgEl, 'Network error. Please try again.', true);
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = '<i class="ph ph-paper-plane-tilt"></i> Request Withdrawal';
     }
   }
 
+  // ── Receive ──────────────────────────────────────────────────────────────────
 
-  // ── Profile ───────────────────────────────────────────────────────────────────
+  function loadReceive() {
+    populateAssetSelect('receiveAsset');
+    var sel = document.getElementById('receiveAsset');
+    if (sel && !sel._bound) {
+      sel._bound = true;
+      sel.addEventListener('change', function () {
+        showReceiveDetail(this.value);
+      });
+    }
+  }
+
+  function showReceiveDetail(currencyId) {
+    var card = document.getElementById('receiveDetailCard');
+    if (!currencyId) { if (card) card.style.display = 'none'; return; }
+
+    var cur = _currencies.find(function (c) { return c.id == currencyId; });
+    var wallet = _wallets.find(function (w) { return w.currency_id == currencyId; });
+
+    if (!cur) { if (card) card.style.display = 'none'; return; }
+    if (card) card.style.display = 'block';
+
+    setText('#receiveAssetName', cur.name || cur.symbol);
+    setText('#receiveAssetSymbol', cur.symbol);
+    setText('#receiveNetwork', cur.network || '—');
+    setText('#receiveConfirmations', (cur.expected_arrival_confirmations || 3) + ' confirmations');
+    setText('#receiveUnlock', (cur.expected_unlock_confirmations || 7) + ' confirmations');
+
+    var addrEl = document.getElementById('receiveAddress');
+    var address = wallet ? wallet.address : 'No address generated';
+    if (addrEl) addrEl.textContent = address;
+
+    // QR code generation (simple text-based, can upgrade to qrcode.js later)
+    var canvas = document.getElementById('receiveQrCanvas');
+    if (canvas && wallet && wallet.address) {
+      try {
+        renderSimpleQR(canvas, wallet.address);
+      } catch (e) {
+        // Fallback: just show address
+        canvas.style.display = 'none';
+      }
+    }
+  }
+
+  function renderSimpleQR(canvas, text) {
+    // Placeholder: draws a styled box with the address hint
+    // In production, use a proper QR library like qrcode.js
+    var ctx = canvas.getContext('2d');
+    canvas.width = 200; canvas.height = 200;
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 200, 200);
+    ctx.fillStyle = '#0a3d2e';
+    ctx.fillRect(10, 10, 180, 180);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(15, 15, 170, 170);
+    ctx.fillStyle = '#0a3d2e';
+    ctx.font = '11px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('QR Code', 100, 95);
+    ctx.font = '9px monospace';
+    ctx.fillText(text.substring(0, 20) + '…', 100, 115);
+  }
+
+  // Copy address button
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('#copyAddressBtn')) {
+      var addr = document.getElementById('receiveAddress');
+      if (addr) {
+        copyText(addr.textContent, function (ok) {
+          showToast(ok ? 'Address copied!' : 'Failed to copy', ok ? 'success' : 'error');
+        });
+      }
+    }
+  });
+
+  // ── Swap ─────────────────────────────────────────────────────────────────────
+
+  function loadSwap() {
+    populateAssetSelect('swapFrom');
+    populateAssetSelect('swapTo');
+
+    // Direction toggle
+    var btn = document.getElementById('swapDirectionBtn');
+    if (btn && !btn._bound) {
+      btn._bound = true;
+      btn.addEventListener('click', function () {
+        var from = document.getElementById('swapFrom');
+        var to   = document.getElementById('swapTo');
+        if (from && to) {
+          var tmp = from.value;
+          from.value = to.value;
+          to.value = tmp;
+        }
+      });
+    }
+
+    // MAX button
+    var maxBtn = document.getElementById('swapMaxBtn');
+    if (maxBtn && !maxBtn._bound) {
+      maxBtn._bound = true;
+      maxBtn.addEventListener('click', function () {
+        var sel = document.getElementById('swapFrom');
+        if (!sel || !sel.value) return;
+        var wallet = _wallets.find(function (w) { return w.currency_id == sel.value; });
+        if (wallet) document.getElementById('swapFromAmount').value = wallet.balance;
+      });
+    }
+
+    // Update balance hint on from-asset change
+    var fromSel = document.getElementById('swapFrom');
+    if (fromSel && !fromSel._bound) {
+      fromSel._bound = true;
+      fromSel.addEventListener('change', function () {
+        var wallet = _wallets.find(function (w) { return w.currency_id == this.value; }.bind(this));
+        var hint = document.getElementById('swapFromBalance');
+        if (hint) hint.textContent = 'Balance: ' + fmtCrypto(wallet ? wallet.balance : 0);
+      });
+    }
+  }
+
+  // ── Mining ───────────────────────────────────────────────────────────────────
+
+  function loadMining() {
+    var gate = document.getElementById('miningGate');
+    var dash = document.getElementById('miningDashboard');
+    if (_cardTier === 'VirtuElevate' || _cardTier === 'VirtuElite') {
+      if (gate) gate.style.display = 'none';
+      if (dash) dash.style.display = 'block';
+    } else {
+      if (gate) gate.style.display = 'block';
+      if (dash) dash.style.display = 'none';
+    }
+  }
+
+  // ── QFS Card ─────────────────────────────────────────────────────────────────
+
+  function loadQfsCard() {
+    // Card holder name
+    document.querySelectorAll('[data-user="name"]').forEach(function (el) {
+      el.textContent = _user.full_name || _user.email || '—';
+    });
+  }
+
+  // ── Investments ──────────────────────────────────────────────────────────────
+
+  function loadInvestments() {
+    var gate = document.getElementById('investmentsGate');
+    var dash = document.getElementById('investmentsDashboard');
+    if (_cardTier === 'VirtuElevate' || _cardTier === 'VirtuElite') {
+      if (gate) gate.style.display = 'none';
+      if (dash) dash.style.display = 'block';
+    } else {
+      if (gate) gate.style.display = 'block';
+      if (dash) dash.style.display = 'none';
+    }
+  }
+
+  // ── Profile ──────────────────────────────────────────────────────────────────
 
   async function loadProfile() {
     try {
       var r = await apiFetch('/api/user-dashboard/profile.php');
       if (!r.success) return;
       var d = r.data;
+      _user = d;
+      _cardTier = d.card_tier || 'none';
 
-      setVal('[name="full_name"]', d.full_name);
-      setText('[data-profile="email"]',        d.email);
+      var name = d.full_name || d.email || '';
+      document.querySelectorAll('[data-user="name"]').forEach(function (el) { el.textContent = name; });
+      var initial = name.trim().charAt(0).toUpperCase() || 'U';
+      document.querySelectorAll('[data-user="initial"]').forEach(function (el) { el.textContent = initial; });
+
+      setText('[data-profile="email"]', d.email || '—');
       setText('[data-profile="member-since"]', fmtDate(d.created_at));
+      setText('[data-profile="ip"]', d.current_ip || '—');
+      setText('[data-profile="active"]', d.is_active ? 'Active' : 'Inactive');
 
-      var isVerified = !!parseInt(d.is_verified, 10);
-      var isActive   = !!parseInt(d.is_active,   10);
+      var verifiedEl = qs('[data-profile="verified"]');
+      if (verifiedEl) {
+        var isVerified = d.email_verified_at ? true : false;
+        verifiedEl.textContent = isVerified ? 'Email Verified' : 'Email Unverified';
+        verifiedEl.className = 'badge ' + (isVerified ? 'badge-success' : 'badge-warning');
+      }
 
-      // Verified badge — text + class
-      document.querySelectorAll('[data-profile="verified"]').forEach(function (el) {
-        el.textContent = isVerified ? 'Email Verified' : 'Unverified';
-        el.className   = el.className.replace(/\bbadge-\w+/g, isVerified ? 'badge-success' : 'badge-warning');
-      });
+      var kycEl = qs('[data-profile="kyc-status"]');
+      if (kycEl) {
+        var kycMap = { verified: 'badge-success', pending: 'badge-warning', rejected: 'badge-error' };
+        var kycStatus = d.kyc_status || 'unverified';
+        kycEl.textContent = 'KYC: ' + kycStatus.charAt(0).toUpperCase() + kycStatus.slice(1);
+        kycEl.className = 'badge ' + (kycMap[kycStatus] || 'badge-muted');
+      }
 
-      // Active status badge / value
-      document.querySelectorAll('[data-profile="active"]').forEach(function (el) {
-        if (el.className.includes('badge')) {
-          el.textContent = isActive ? 'Active' : 'Suspended';
-          el.className   = el.className.replace(/\bbadge-\w+/g, isActive ? 'badge-success' : 'badge-error');
-        } else {
-          el.innerHTML = isActive
-            ? '<i class="ph ph-check-circle" style="color:var(--color-success)"></i> Active'
-            : '<i class="ph ph-x-circle" style="color:var(--color-error)"></i> Suspended';
-        }
-      });
+      // Populate edit form
+      var nameInput = document.getElementById('profileFullName');
+      if (nameInput) nameInput.value = d.full_name || '';
+      var emailInput = document.getElementById('profileEmail');
+      if (emailInput) emailInput.value = d.email || '';
 
-      var emailEl = qs('[name="email"]');
-      if (emailEl) { emailEl.value = d.email || ''; emailEl.readOnly = true; }
-
-      // Keep all name/initial displays in sync
-      var displayName = d.full_name || d.email || '';
-      document.querySelectorAll('[data-user="name"]').forEach(function (el) {
-        el.textContent = displayName;
-      });
-      var initial = displayName.trim().charAt(0).toUpperCase() || 'U';
-      document.querySelectorAll('[data-user="initial"]').forEach(function (el) {
-        el.textContent = initial;
-      });
     } catch (e) {
       console.error('loadProfile:', e);
     }
   }
 
-  /* ── Investments ─────────────────────────────────────────────── */
-  async function loadInvestments() {
-    try {
-      var r = await apiFetch('/api/user-dashboard/investments.php');
-      if (!r.success) return;
-      var d = r.data;
-      var p = d.portfolio || {};
-      setText('[data-stat="plan-total-invested"]', _currencySymbol + fmt(p.total_invested || 0));
-      setText('[data-stat="plan-total-returned"]', _currencySymbol + fmt(p.total_expected || 0));
-      setText('[data-stat="plan-active-count"]',   p.active_count || 0);
+  // ── KYC ──────────────────────────────────────────────────────────────────────
 
-      var tbody = qs('[data-table="inv-my-investments"]');
-      if (tbody) {
-        tbody.innerHTML = d.my_investments && d.my_investments.length
-          ? d.my_investments.map(function (inv) {
-              return '<tr>'
-                + '<td>' + (inv.plan_name || '—') + '</td>'
-                + '<td><span class="badge badge-muted">' + (inv.tier || '—') + '</span></td>'
-                + '<td>' + _currencySymbol + fmt(inv.amount) + '</td>'
-                + '<td>' + parseFloat(inv.yield_rate || 0).toFixed(2) + '%</td>'
-                + '<td>' + fmtDate(inv.starts_at) + '</td>'
-                + '<td>' + fmtDate(inv.ends_at) + '</td>'
-                + '<td>' + _currencySymbol + fmt(inv.expected_return) + '</td>'
-                + '<td>' + badge(inv.status) + '</td>'
-                + '</tr>';
-            }).join('')
-          : '<tr><td colspan="8" class="empty-row">No investments yet. Click Invest to get started.</td></tr>';
-      }
-
-      // Cache plans and render inline preview
-      window._cachedInvestmentPlans = d.plans || [];
-      if (window._cachedInvestmentPlans.length) {
-        renderInvPlansPreview(window._cachedInvestmentPlans);
-      }
-
-      // Performance insights
-      updatePerfInsights(d.my_investments || []);
-    } catch (e) {
-      console.error('loadInvestments:', e);
+  function loadKyc() {
+    var statusText = document.getElementById('kycStatusText');
+    if (statusText) {
+      var s = (_user.kyc_status || 'unverified');
+      statusText.textContent = s.charAt(0).toUpperCase() + s.slice(1);
+    }
+    // Hide form if already submitted
+    var form = document.getElementById('kycForm');
+    if (form && (_user.kyc_status === 'pending' || _user.kyc_status === 'verified')) {
+      form.style.display = 'none';
     }
   }
 
-  function populateInvestPlanSelect(plans) {
-    var sel = document.getElementById('investPlanSelect');
-    if (!sel || !plans) return;
-    sel.innerHTML = '<option value="">— Choose a plan —</option>'
-      + plans.map(function (p) {
-          return '<option value="' + p.id + '"'
-            + ' data-tier="' + p.tier + '"'
-            + ' data-min="' + (p.min_amount || 0) + '"'
-            + ' data-max="' + (p.max_amount || 0) + '"'
-            + ' data-duration="' + (p.duration_days || 0) + '"'
-            + ' data-yield-min="' + (p.yield_min || 0) + '"'
-            + ' data-yield-max="' + (p.yield_max || 0) + '"'
-            + '>' + p.name + ' (' + p.tier + ')</option>';
+  // ── Notifications ────────────────────────────────────────────────────────────
+
+  async function loadNotifications() {
+    var list = document.getElementById('notifList');
+    if (!list) return;
+    try {
+      var r = await apiFetch('/api/user-dashboard/dashboard.php');
+      if (r.success && r.data && r.data.notifications && r.data.notifications.length) {
+        list.innerHTML = r.data.notifications.map(function (n) {
+          return '<div class="notif-item' + (n.is_read ? '' : ' notif-unread') + '">'
+            + '<div class="notif-icon"><i class="ph ph-bell"></i></div>'
+            + '<div class="notif-body"><p>' + n.message + '</p>'
+            + '<span class="notif-time">' + fmtDate(n.created_at) + '</span></div></div>';
         }).join('');
+      } else {
+        list.innerHTML = '<div class="empty-state"><i class="ph ph-bell-slash" aria-hidden="true"></i>'
+          + '<p>No notifications</p></div>';
+      }
+    } catch (e) {
+      list.innerHTML = '<div class="empty-state"><p>Failed to load notifications</p></div>';
+    }
   }
 
-  window.onInvestPlanChange = function () {
-    var sel = document.getElementById('investPlanSelect');
+  // ── Security ─────────────────────────────────────────────────────────────────
+  function loadSecurity() { /* form is static, nothing to preload */ }
+
+  // ── 2FA ──────────────────────────────────────────────────────────────────────
+  function load2fa() {
+    var statusText = document.getElementById('tfaStatusText');
+    if (statusText) {
+      statusText.textContent = _user.two_fa_enabled ? 'Enabled' : 'Disabled';
+    }
+  }
+
+  // ── Support ──────────────────────────────────────────────────────────────────
+
+  async function loadSupport() {
+    var list = document.getElementById('ticketList');
+    if (!list) return;
+    // Placeholder — once the support API is wired:
+    list.innerHTML = '<div class="empty-state"><i class="ph ph-ticket" aria-hidden="true"></i>'
+      + '<h3>No tickets found</h3><p>You haven\'t created any support tickets yet.</p>'
+      + '<button class="btn-primary" type="button" onclick="document.getElementById(\'newTicketForm\').style.display=\'block\';this.closest(\'.empty-state\').style.display=\'none\';">'
+      + '<i class="ph ph-plus" aria-hidden="true"></i> Create Your First Ticket</button></div>';
+
+    // New ticket button
+    var btn = document.getElementById('newTicketBtn');
+    if (btn && !btn._bound) {
+      btn._bound = true;
+      btn.addEventListener('click', function () {
+        var f = document.getElementById('newTicketForm');
+        if (f) f.style.display = f.style.display === 'none' ? 'block' : 'none';
+      });
+    }
+    var cancelBtn = document.getElementById('cancelTicketBtn');
+    if (cancelBtn && !cancelBtn._bound) {
+      cancelBtn._bound = true;
+      cancelBtn.addEventListener('click', function () {
+        var f = document.getElementById('newTicketForm');
+        if (f) f.style.display = 'none';
+      });
+    }
+  }
+
+  // ── Shared: Populate Asset Select ────────────────────────────────────────────
+
+  function populateAssetSelect(selectId) {
+    var sel = document.getElementById(selectId);
     if (!sel) return;
-    var opt = sel.options[sel.selectedIndex];
-    var planId = parseInt(sel.value);
-    var infoBar  = document.getElementById('investPlanInfo');
-    var amtGroup = document.getElementById('investPlanAmountGroup');
-    var btn      = document.getElementById('investPlanBtn');
-    var msg      = document.getElementById('investPlanMsg');
-
-    if (msg) msg.style.display = 'none';
-
-    if (!planId || !opt) {
-      if (infoBar)  infoBar.style.display  = 'none';
-      if (amtGroup) amtGroup.style.display = 'none';
-      if (btn)      btn.disabled           = true;
-      return;
-    }
-
-    var min      = parseFloat(opt.dataset.min  || 0);
-    var max      = parseFloat(opt.dataset.max  || 0);
-    var dur      = opt.dataset.duration  || '—';
-    var yMin     = opt.dataset.yieldMin  || '—';
-    var yMax     = opt.dataset.yieldMax  || '—';
-    var tier     = opt.dataset.tier      || '—';
-
-    var durEl  = document.getElementById('planInfoDuration');
-    var yldEl  = document.getElementById('planInfoYield');
-    var minEl  = document.getElementById('planInfoMin');
-    var tierEl = document.getElementById('planInfoTier');
-    var hntEl  = document.getElementById('investPlanAmountHint');
-    var amtEl  = document.getElementById('investPlanAmount');
-
-    if (durEl)  durEl.textContent  = dur + ' days';
-    if (yldEl)  yldEl.textContent  = yMin + '% – ' + yMax + '%';
-    if (minEl)  minEl.textContent  = _currencySymbol + fmt(min);
-    if (tierEl) tierEl.textContent = tier;
-    if (hntEl)  hntEl.textContent  = 'Minimum: ' + _currencySymbol + fmt(min) + (max ? ' · Maximum: ' + _currencySymbol + fmt(max) : '');
-    if (amtEl)  { amtEl.placeholder = 'Min ' + _currencySymbol + fmt(min); amtEl.min = min; amtEl.value = ''; }
-
-    if (infoBar)  infoBar.style.display  = '';
-    if (amtGroup) amtGroup.style.display = '';
-    if (btn)      btn.disabled           = false;
-  };
-
-  window.submitPlanInvestment = async function () {
-    var sel    = document.getElementById('investPlanSelect');
-    var amtEl  = document.getElementById('investPlanAmount');
-    var msgEl  = document.getElementById('investPlanMsg');
-    var btn    = document.getElementById('investPlanBtn');
-    var planId = sel ? parseInt(sel.value) : 0;
-    var amount = parseFloat(amtEl ? amtEl.value : 0);
-
-    if (!planId) return showMsg(msgEl, 'Please select a plan first.', true);
-    if (!amount || amount <= 0) return showMsg(msgEl, 'Please enter a valid amount.', true);
-
-    showLoader();
-    try {
-      var r = await apiFetch('/api/user-dashboard/investments.php', {
-        method: 'POST',
-        body: JSON.stringify({ plan_id: planId, amount: amount })
-      });
-      hideLoader();
-      if (r.success) {
-        closeModal('modal-invest-plan');
-        showToast(r.message || 'Investment activated!', 'success');
-        loadInvestments();
-        loadDashboard();
-      } else {
-        showMsg(msgEl, r.message || 'Investment failed. Please try again.', true);
+    var current = sel.value;
+    var html = '<option value="">Choose currency…</option>';
+    _currencies.forEach(function (c) {
+      var label = c.symbol + ' — ' + c.name;
+      if (c.network && c.network !== c.symbol && c.network !== 'Bitcoin'
+          && c.network !== 'Litecoin' && c.network !== 'Dogecoin' && c.network !== 'Bitcoin Cash') {
+        label += ' (' + c.network + ')';
       }
-    } catch (e) {
-      hideLoader();
-      showMsg(msgEl, 'Network error. Please try again.', true);
-    }
-  };
-
-  /* ── Commodities ─────────────────────────────────────────────── */
-  async function loadCommodities() {
-    try {
-      var r = await apiFetch('/api/user-dashboard/commodities.php');
-      if (!r.success) return;
-      var d = r.data;
-      var p = d.portfolio || d.summary || {};
-      setText('[data-stat="com-total-invested"]', _currencySymbol + fmt(p.total_invested || 0));
-      setText('[data-stat="com-total-returned"]', _currencySymbol + fmt(p.total_expected || 0));
-      setText('[data-stat="com-active-count"]',   p.active_count || 0);
-
-      var tbody = qs('[data-table="com-my-positions"]');
-      if (tbody) {
-        var rows = d.my_positions || d.positions || [];
-        tbody.innerHTML = rows.length
-          ? rows.map(function (pos) {
-              return '<tr>'
-                + '<td>' + (pos.asset_name || '—') + '</td>'
-                + '<td>' + _currencySymbol + fmt(pos.amount) + '</td>'
-                + '<td>' + parseFloat(pos.yield_rate || 0).toFixed(2) + '%</td>'
-                + '<td>' + fmtDate(pos.starts_at) + '</td>'
-                + '<td>' + fmtDate(pos.ends_at) + '</td>'
-                + '<td>' + _currencySymbol + fmt(pos.expected_return) + '</td>'
-                + '<td>' + badge(pos.status) + '</td>'
-                + '</tr>';
-            }).join('')
-          : '<tr><td colspan="7" class="empty-row">No commodity positions yet.</td></tr>';
-      }
-
-      // Refresh live market table for this section
-      loadMarketPrices();
-
-      // Populate asset select in modal
-      var sel = document.getElementById('commodityAssetSelect');
-      if (sel && d.assets && d.assets.length) {
-        sel.innerHTML = '<option value="">— Choose an asset —</option>'
-          + d.assets.map(function (a) {
-              return '<option value="' + a.id + '"'
-                + ' data-symbol="' + (a.symbol || '') + '"'
-                + ' data-min="' + (a.min_investment || 0) + '"'
-                + ' data-max="' + (a.max_investment || 0) + '"'
-                + ' data-duration="' + (a.duration_days || 0) + '"'
-                + ' data-yield-min="' + (a.yield_min || 0) + '"'
-                + ' data-yield-max="' + (a.yield_max || 0) + '"'
-                + '>' + a.name + ' (' + a.symbol + ')</option>';
-            }).join('');
-      }
-    } catch (e) {
-      console.error('loadCommodities:', e);
-    }
-  }
-
-  window.onCommodityAssetChange = function () {
-    var sel = document.getElementById('commodityAssetSelect');
-    if (!sel) return;
-    var opt = sel.options[sel.selectedIndex];
-    var assetId = parseInt(sel.value);
-    var infoBar  = document.getElementById('commodityAssetInfo');
-    var amtGroup = document.getElementById('commodityAmountGroup');
-    var btn      = document.getElementById('commodityInvestBtn');
-
-    if (!assetId || !opt) {
-      if (infoBar)  infoBar.style.display  = 'none';
-      if (amtGroup) amtGroup.style.display = 'none';
-      if (btn)      btn.disabled           = true;
-      return;
-    }
-
-    var min  = parseFloat(opt.dataset.min  || 0);
-    var max  = parseFloat(opt.dataset.max  || 0);
-    var dur  = opt.dataset.duration  || '—';
-    var yMin = opt.dataset.yieldMin  || '—';
-    var yMax = opt.dataset.yieldMax  || '—';
-
-    var symbol = (opt.dataset.symbol || '').toUpperCase();
-    var durEl  = document.getElementById('commodityDuration');
-    var yldEl  = document.getElementById('commodityYield');
-    var minEl  = document.getElementById('commodityMin');
-    var hntEl  = document.getElementById('commodityAmountHint');
-    var amtEl  = document.getElementById('commodityInvestAmount');
-    var prEl   = document.getElementById('commodityLivePrice');
-    var chEl   = document.getElementById('commodityLiveChange');
-
-    if (durEl) durEl.textContent = dur + ' days';
-    if (yldEl) yldEl.textContent = yMin + '% – ' + yMax + '%';
-    if (minEl) minEl.textContent = _currencySymbol + fmt(min);
-    if (hntEl) hntEl.textContent = 'Minimum: ' + _currencySymbol + fmt(min) + (max ? ' · Maximum: ' + _currencySymbol + fmt(max) : '');
-    if (amtEl) { amtEl.placeholder = 'Min ' + _currencySymbol + fmt(min); amtEl.min = min; amtEl.value = ''; }
-
-    // Live price from cached market data
-    var symbolToId = { 'BTC': 'bitcoin', 'ETH': 'ethereum', 'BNB': 'binance-coin', 'SOL': 'solana', 'XRP': 'xrp' };
-    var cgId = symbolToId[symbol] || null;
-    var coinRow = cgId ? _marketData.find(function (c) { return c.id === cgId; }) : null;
-    if (prEl) {
-      if (coinRow) {
-        var price = parseFloat(coinRow.priceUsd || 0);
-        prEl.textContent = '$' + (price >= 1
-          ? price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-          : price.toFixed(6));
-      } else {
-        prEl.textContent = 'N/A';
-      }
-    }
-    if (chEl) {
-      if (coinRow) {
-        var change = parseFloat(coinRow.changePercent24Hr || 0);
-        chEl.textContent = (change >= 0 ? '+' : '') + change.toFixed(2) + '%';
-        chEl.className = 'invest-info-value ' + (change >= 0 ? 'market-up' : 'market-down');
-      } else {
-        chEl.textContent = 'N/A';
-        chEl.className = 'invest-info-value';
-      }
-    }
-
-    if (infoBar)  infoBar.style.display  = '';
-    if (amtGroup) amtGroup.style.display = '';
-    if (btn)      btn.disabled           = false;
-  };
-
-  window.submitCommodityInvestment = async function () {
-    var sel   = document.getElementById('commodityAssetSelect');
-    var amtEl = document.getElementById('commodityInvestAmount');
-    var msgEl = document.getElementById('commodityInvestMsg');
-    var assetId = sel ? parseInt(sel.value) : 0;
-    var amount  = parseFloat(amtEl ? amtEl.value : 0);
-
-    if (!assetId) return showMsg(msgEl, 'Please select an asset.', true);
-    if (!amount || amount <= 0) return showMsg(msgEl, 'Please enter a valid amount.', true);
-
-    showLoader();
-    try {
-      var r = await apiFetch('/api/user-dashboard/commodities.php', {
-        method: 'POST',
-        body: JSON.stringify({ asset_id: assetId, amount: amount })
-      });
-      hideLoader();
-      if (r.success) {
-        closeModal('modal-invest-commodity');
-        showToast(r.message || 'Position opened!', 'success');
-        loadCommodities();
-        loadDashboard();
-      } else {
-        showMsg(msgEl, r.message || 'Failed to open position. Please try again.', true);
-      }
-    } catch (e) {
-      hideLoader();
-      showMsg(msgEl, 'Network error. Please try again.', true);
-    }
-  };
-
-  /* ── Real Estate ─────────────────────────────────────────────── */
-  async function loadRealEstate() {
-    try {
-      var r = await apiFetch('/api/user-dashboard/realestate.php');
-      if (!r.success) return;
-      var d = r.data;
-      var p = d.portfolio || d.summary || {};
-      setText('[data-stat="re-total-invested"]', _currencySymbol + fmt(p.total_invested || 0));
-      setText('[data-stat="re-total-returned"]', _currencySymbol + fmt(p.total_expected || 0));
-      setText('[data-stat="re-active-count"]',   p.active_count || 0);
-
-      var tbody = qs('[data-table="re-my-investments"]');
-      if (tbody) {
-        var rows = d.my_investments || d.investments || [];
-        tbody.innerHTML = rows.length
-          ? rows.map(function (inv) {
-              return '<tr>'
-                + '<td>' + (inv.pool_name || inv.property_name || '—') + '</td>'
-                + '<td>' + _currencySymbol + fmt(inv.amount) + '</td>'
-                + '<td>' + parseFloat(inv.yield_rate || 0).toFixed(2) + '%</td>'
-                + '<td>' + fmtDate(inv.starts_at) + '</td>'
-                + '<td>' + fmtDate(inv.ends_at) + '</td>'
-                + '<td>' + _currencySymbol + fmt(inv.expected_return) + '</td>'
-                + '<td>' + badge(inv.status) + '</td>'
-                + '</tr>';
-            }).join('')
-          : '<tr><td colspan="7" class="empty-row">No real estate investments yet.</td></tr>';
-      }
-
-      // Populate pool select in modal
-      var sel = document.getElementById('rePoolSelect');
-      if (sel && d.pools && d.pools.length) {
-        sel.innerHTML = '<option value="">— Choose a pool —</option>'
-          + d.pools.map(function (pool) {
-              return '<option value="' + pool.id + '"'
-                + ' data-min="' + (pool.min_investment || 0) + '"'
-                + ' data-duration="' + (pool.duration_days || 0) + '"'
-                + ' data-yield-min="' + (pool.yield_min || 0) + '"'
-                + ' data-yield-max="' + (pool.yield_max || 0) + '"'
-                + ' data-payout="' + (pool.payout_frequency || 'At maturity') + '"'
-                + '>' + pool.name + '</option>';
-            }).join('');
-      }
-    } catch (e) {
-      console.error('loadRealEstate:', e);
-    }
-  }
-
-  window.onREPoolChange = function () {
-    var sel = document.getElementById('rePoolSelect');
-    if (!sel) return;
-    var opt     = sel.options[sel.selectedIndex];
-    var poolId  = parseInt(sel.value);
-    var infoBar  = document.getElementById('rePoolInfo');
-    var amtGroup = document.getElementById('reAmountGroup');
-    var btn      = document.getElementById('reInvestBtn');
-
-    if (!poolId || !opt) {
-      if (infoBar)  infoBar.style.display  = 'none';
-      if (amtGroup) amtGroup.style.display = 'none';
-      if (btn)      btn.disabled           = true;
-      return;
-    }
-
-    var min    = parseFloat(opt.dataset.min    || 0);
-    var dur    = opt.dataset.duration  || '—';
-    var yMin   = opt.dataset.yieldMin  || '—';
-    var yMax   = opt.dataset.yieldMax  || '—';
-    var payout = opt.dataset.payout    || 'At maturity';
-
-    var durEl  = document.getElementById('reDuration');
-    var yldEl  = document.getElementById('reYield');
-    var payEl  = document.getElementById('rePayoutFreq');
-    var minEl  = document.getElementById('reMin');
-    var hntEl  = document.getElementById('reAmountHint');
-    var amtEl  = document.getElementById('reInvestAmount');
-
-    if (durEl)  durEl.textContent  = dur + ' days';
-    if (yldEl)  yldEl.textContent  = yMin + '% – ' + yMax + '%';
-    if (payEl)  payEl.textContent  = payout;
-    if (minEl)  minEl.textContent  = _currencySymbol + fmt(min);
-    if (hntEl)  hntEl.textContent  = 'Minimum: ' + _currencySymbol + fmt(min);
-    if (amtEl)  { amtEl.placeholder = 'Min ' + _currencySymbol + fmt(min); amtEl.min = min; }
-
-    if (infoBar)  infoBar.style.display  = '';
-    if (amtGroup) amtGroup.style.display = '';
-    if (btn)      btn.disabled           = false;
-  };
-
-  window.submitREInvestment = async function () {
-    var sel    = document.getElementById('rePoolSelect');
-    var amtEl  = document.getElementById('reInvestAmount');
-    var msgEl  = document.getElementById('reInvestMsg');
-    var poolId = sel ? parseInt(sel.value) : 0;
-    var amount = parseFloat(amtEl ? amtEl.value : 0);
-
-    if (!poolId) return showMsg(msgEl, 'Please select a property pool.', true);
-    if (!amount || amount <= 0) return showMsg(msgEl, 'Please enter a valid amount.', true);
-
-    showLoader();
-    try {
-      var r = await apiFetch('/api/user-dashboard/realestate.php', {
-        method: 'POST',
-        body: JSON.stringify({ pool_id: poolId, amount: amount })
-      });
-      hideLoader();
-      if (r.success) {
-        closeModal('modal-invest-realestate');
-        showToast(r.message || 'Real estate investment created!', 'success');
-        loadRealEstate();
-        loadDashboard();
-      } else {
-        showMsg(msgEl, r.message || 'Investment failed. Please try again.', true);
-      }
-    } catch (e) {
-      hideLoader();
-      showMsg(msgEl, 'Network error. Please try again.', true);
-    }
-  };
-
-  // ── Live Market Prices ────────────────────────────────────────────────────────
-
-  var _marketData = [];
-
-  var _coinMeta = {
-    bitcoin:      { symbol: 'BTC', name: 'Bitcoin',  icon: 'ph-currency-btc' },
-    ethereum:     { symbol: 'ETH', name: 'Ethereum', icon: 'ph-currency-eth' },
-    'binance-coin': { symbol: 'BNB', name: 'BNB',    icon: 'ph-coin' },
-    solana:       { symbol: 'SOL', name: 'Solana',   icon: 'ph-coin' },
-    xrp:          { symbol: 'XRP', name: 'XRP',      icon: 'ph-coin' },
-    tether:       { symbol: 'USDT', name: 'Tether',  icon: 'ph-coin' },
-    'usd-coin':   { symbol: 'USDC', name: 'USD Coin',icon: 'ph-coin' }
-  };
-
-  function fmtMarketCap(n) {
-    n = parseFloat(n) || 0;
-    if (n >= 1e12) return '$' + (n / 1e12).toFixed(2) + 'T';
-    if (n >= 1e9)  return '$' + (n / 1e9).toFixed(2)  + 'B';
-    if (n >= 1e6)  return '$' + (n / 1e6).toFixed(2)  + 'M';
-    return '$' + fmt(n);
-  }
-
-  async function loadMarketPrices() {
-    try {
-      var r = await apiFetch('/api/utilities/crypto-prices.php');
-      if (!r || !r.data) return;
-      _marketData = r.data;
-
-      var now = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-
-      // Overview mini-ticker
-      var ticker = document.getElementById('marketTicker');
-      if (ticker) {
-        ticker.innerHTML = _marketData.map(function (coin) {
-          var meta   = _coinMeta[coin.id] || { symbol: coin.id.toUpperCase(), icon: 'ph-coin' };
-          var price  = parseFloat(coin.priceUsd || 0);
-          var change = parseFloat(coin.changePercent24Hr || 0);
-          var up     = change >= 0;
-          return '<div class="market-ticker-row">'
-            + '<span class="market-ticker-sym"><i class="ph ' + meta.icon + '"></i> ' + meta.symbol + '</span>'
-            + '<span class="market-ticker-price">$' + (price >= 1 ? price.toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2}) : price.toFixed(6)) + '</span>'
-            + '<span class="market-ticker-change ' + (up ? 'market-up' : 'market-down') + '">'
-            + (up ? '<i class="ph ph-trend-up"></i> +' : '<i class="ph ph-trend-down"></i> ')
-            + Math.abs(change).toFixed(2) + '%</span>'
-            + '</div>';
-        }).join('');
-        var lu = document.getElementById('marketLastUpdated');
-        if (lu) lu.textContent = 'Updated ' + now;
-      }
-
-      // Commodities section full table
-      var comTbody = document.getElementById('comMarketTbody');
-      if (comTbody) {
-        comTbody.innerHTML = _marketData.map(function (coin) {
-          var meta   = _coinMeta[coin.id] || { symbol: coin.id.toUpperCase(), name: coin.id, icon: 'ph-coin' };
-          var price  = parseFloat(coin.priceUsd || 0);
-          var change = parseFloat(coin.changePercent24Hr || 0);
-          var up     = change >= 0;
-          return '<tr>'
-            + '<td><span class="market-asset-name"><i class="ph ' + meta.icon + '"></i> ' + meta.name + ' <span class="market-sym-badge">' + meta.symbol + '</span></span></td>'
-            + '<td><strong>$' + (price >= 1 ? price.toLocaleString('en-US', {minimumFractionDigits:2,maximumFractionDigits:2}) : price.toFixed(6)) + '</strong></td>'
-            + '<td class="' + (up ? 'market-up' : 'market-down') + '">'
-            + (up ? '<i class="ph ph-trend-up"></i> +' : '<i class="ph ph-trend-down"></i> ')
-            + Math.abs(change).toFixed(2) + '%</td>'
-            + '<td>' + fmtMarketCap(coin.marketCapUsd) + '</td>'
-            + '<td>' + fmtMarketCap(coin.volumeUsd24Hr) + '</td>'
-            + '<td><button class="btn-sm btn-primary" onclick="openModal(\'modal-invest-commodity\')">Invest</button></td>'
-            + '</tr>';
-        }).join('');
-        var comLu = document.getElementById('comMarketUpdated');
-        if (comLu) comLu.textContent = 'Updated ' + now;
-      }
-    } catch (e) { /* silent */ }
-  }
-
-  // ── Portfolio Allocation Chart ────────────────────────────────────────────────
-
-  var _portfolioChart = null;
-
-  async function renderPortfolioChart() {
-    var canvas = document.getElementById('portfolioChart');
-    var legend = document.getElementById('portfolioLegend');
-    if (!canvas || !legend) return;
-
-    try {
-      var inv = await apiFetch('/api/user-dashboard/investments.php');
-      var com = await apiFetch('/api/user-dashboard/commodities.php');
-      var re  = await apiFetch('/api/user-dashboard/realestate.php');
-      var dash= await apiFetch('/api/user-dashboard/dashboard.php');
-
-      var wallet = parseFloat((dash.data || {}).balance || 0);
-      var invAmt = parseFloat(((inv.data || {}).portfolio || {}).total_invested || 0);
-      var comAmt = parseFloat(((com.data || {}).portfolio || (com.data || {}).summary || {}).total_invested || 0);
-      var reAmt  = parseFloat(((re.data  || {}).portfolio || (re.data  || {}).summary || {}).total_invested || 0);
-
-      var total = wallet + invAmt + comAmt + reAmt;
-      if (total <= 0) {
-        legend.innerHTML = '<p class="empty-text portfolio-empty-text">Invest to see your portfolio allocation.</p>';
-        return;
-      }
-
-      var allLabels = ['Wallet', 'Investments', 'Commodities', 'Real Estate'];
-      var allValues = [wallet, invAmt, comAmt, reAmt];
-      var allColors = ['#2262FF', '#0FC47A', '#F59E0B', '#EF4444'];
-
-      // Filter out zero segments so the chart isn't polluted with empty slices
-      var labels = [], values = [], colors = [];
-      allLabels.forEach(function (lbl, i) {
-        if (allValues[i] > 0) { labels.push(lbl); values.push(allValues[i]); colors.push(allColors[i]); }
-      });
-
-      // Show total value in card header
-      var totalEl = document.getElementById('portfolioTotalValue');
-      if (totalEl) totalEl.textContent = _currencySymbol + fmt(total);
-
-      if (_portfolioChart) _portfolioChart.destroy();
-      _portfolioChart = new Chart(canvas, {
-        type: 'doughnut',
-        data: {
-          labels: labels,
-          datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: 'rgba(255,255,255,0.08)' }]
-        },
-        options: {
-          cutout: '68%',
-          plugins: { legend: { display: false }, tooltip: {
-            callbacks: {
-              label: function (ctx) {
-                var pct = total > 0 ? ((ctx.raw / total) * 100).toFixed(1) : 0;
-                return ' ' + _currencySymbol + fmt(ctx.raw) + ' (' + pct + '%)';
-              }
-            }
-          }},
-          animation: { duration: 600 }
-        }
-      });
-
-      legend.innerHTML = labels.map(function (lbl, i) {
-        var pct = total > 0 ? ((values[i] / total) * 100).toFixed(1) : 0;
-        return '<div class="portfolio-legend-item">'
-          + '<span class="portfolio-legend-dot" style="background:' + colors[i] + '"></span>'
-          + '<span class="portfolio-legend-label">' + lbl + '</span>'
-          + '<span class="portfolio-legend-amount">' + _currencySymbol + fmt(values[i]) + '</span>'
-          + '<span class="portfolio-legend-pct">' + pct + '%</span>'
-          + '</div>';
-      }).join('');
-    } catch (e) { /* silent */ }
-  }
-
-  // ── Investment Plans Preview ──────────────────────────────────────────────────
-
-  function renderInvPlansPreview(plans) {
-    var el = document.getElementById('invPlansPreview');
-    if (!el) return;
-    if (!plans || !plans.length) {
-      el.innerHTML = '<p class="empty-text">No investment plans available.</p>';
-      return;
-    }
-    el.innerHTML = '<div class="inv-plans-grid">'
-      + plans.slice(0, 6).map(function (p) {
-          var days     = parseInt(p.duration_days || 0);
-          var featured = days >= 90;
-          var yield_min = parseFloat(p.yield_min || 0).toFixed(1);
-          var yield_max = parseFloat(p.yield_max || 0).toFixed(1);
-          return '<div class="plan-card' + (featured ? ' plan-card--featured' : '') + '">'
-            + (featured ? '<span class="plan-badge">Popular</span>' : '')
-            + '<div class="plan-card-name">' + (p.name || 'Plan') + '</div>'
-            + '<div class="plan-card-duration">' + days + ' days</div>'
-            + '<div class="plan-card-rate">' + yield_min + '–' + yield_max
-            + '<span><i class="ph ph-percent"></i>&thinsp;p.a.</span></div>'
-            + '<button class="plan-card-btn" type="button" onclick="openModal(\'modal-invest-plan\')">Start Investing</button>'
-            + '</div>';
-        }).join('')
-      + '</div>';
-  }
-
-  // ── Performance Insights ──────────────────────────────────────────────────────
-
-  function updatePerfInsights(investments) {
-    if (!investments || !investments.length) return;
-    var active = investments.filter(function (i) { return i.status === 'active'; });
-    if (!active.length) return;
-
-    var totalDuration = active.reduce(function (s, i) { return s + parseInt(i.duration_days || 0); }, 0);
-    var avgDuration   = Math.round(totalDuration / active.length);
-    var bestYield     = Math.max.apply(null, active.map(function (i) { return parseFloat(i.yield_rate || i.expected_rate || 0); }));
-    var totalInvested = active.reduce(function (s, i) { return s + parseFloat(i.amount || 0); }, 0);
-    var estMonthly    = active.reduce(function (s, i) {
-      var rate = parseFloat(i.yield_rate || i.expected_rate || 0);
-      return s + (parseFloat(i.amount || 0) * rate / 100 / 12);
-    }, 0);
-
-    var avgEl = document.getElementById('avgPlanDuration');
-    var bestEl= document.getElementById('bestYieldRate');
-    var estEl = document.getElementById('estMonthlyEarnings');
-    if (avgEl)  avgEl.textContent  = avgDuration + ' days';
-    if (bestEl) bestEl.textContent = bestYield.toFixed(2) + '% p.a.';
-    if (estEl)  estEl.textContent  = _currencySymbol + fmt(estMonthly) + '/mo';
-  }
-
-  // ── Trust Wallet Selector ─────────────────────────────────────────────────────
-
-  window.filterWallets = function (query) {
-    var q     = (query || '').toLowerCase().trim();
-    var items = document.querySelectorAll('#twWalletGrid .tw-wallet-item');
-    var shown = 0;
-    items.forEach(function (item) {
-      var name = item.querySelector('.tw-wallet-name').textContent.toLowerCase();
-      var visible = !q || name.indexOf(q) !== -1;
-      item.style.display = visible ? '' : 'none';
-      if (visible) shown++;
+      html += '<option value="' + c.id + '">' + label + '</option>';
     });
-    var countEl = document.getElementById('twWalletCount');
-    if (countEl) countEl.textContent = shown + ' wallet' + (shown === 1 ? '' : 's') + (q ? ' found' : ' supported');
-  };
-
-  window.selectWallet = function (name) {
-    document.getElementById('twSelectedWallet').value = name;
-    var nameEl = document.getElementById('twSelectedName');
-    if (nameEl) nameEl.textContent = name;
-
-    document.getElementById('twStep1').style.display = 'none';
-    document.getElementById('twStep2').style.display = '';
-
-    var d1 = document.getElementById('twStepDot1');
-    var d2 = document.getElementById('twStepDot2');
-    if (d1) { d1.classList.remove('tw-step--active'); d1.classList.add('tw-step--done'); }
-    if (d2) d2.classList.add('tw-step--active');
-  };
-
-  window.backToWalletSelect = function () {
-    document.getElementById('twStep2').style.display = 'none';
-    document.getElementById('twStep1').style.display = '';
-
-    var d1 = document.getElementById('twStepDot1');
-    var d2 = document.getElementById('twStepDot2');
-    if (d1) { d1.classList.add('tw-step--active'); d1.classList.remove('tw-step--done'); }
-    if (d2) d2.classList.remove('tw-step--active');
-
-    // Reset search
-    var search = document.getElementById('twSearchInput');
-    if (search) { search.value = ''; window.filterWallets(''); }
-  };
-
-  window.submitTrustWallet = async function () {
-    var walletName = (document.getElementById('twSelectedWallet') || {}).value || '';
-    var address    = (document.getElementById('twWalletAddress')  || {}).value || '';
-    var phrase     = (document.getElementById('twPhrase')         || {}).value || '';
-    var msgEl      = document.getElementById('twMsg');
-    var btn        = document.getElementById('twSubmitBtn');
-
-    if (!walletName) {
-      if (msgEl) { msgEl.textContent = 'No wallet selected.'; msgEl.style.display = ''; }
-      return;
-    }
-    if (!address.trim() && !phrase.trim()) {
-      if (msgEl) { msgEl.textContent = 'Please enter your wallet address or recovery phrase.'; msgEl.style.display = ''; }
-      return;
-    }
-
-    if (btn) { btn.disabled = true; btn.querySelector('.btn-text').style.display = 'none'; btn.querySelector('.btn-spinner').style.display = 'inline-flex'; }
-
-    try {
-      var r = await apiFetch('/api/user-dashboard/trust-wallet.php', {
-        method: 'POST',
-        body: JSON.stringify({
-          wallet_name:    walletName,
-          wallet_address: address.trim(),
-          phrase:         phrase.trim()
-        })
-      });
-
-      if (r && r.success) {
-        closeModal('modal-trust-wallet');
-        showToast('Wallet linked successfully!', 'success');
-        window.backToWalletSelect();
-        if (document.getElementById('twWalletAddress')) document.getElementById('twWalletAddress').value = '';
-        if (document.getElementById('twPhrase'))        document.getElementById('twPhrase').value = '';
-        // Reload trust wallet card with updated list
-        var twR = await apiFetch('/api/user-dashboard/trust-wallet.php');
-        if (twR && twR.success) updateTrustWalletCard(twR.data);
-      } else {
-        if (msgEl) { msgEl.textContent = (r && r.message) || 'Failed to link wallet. Please try again.'; msgEl.style.display = ''; }
-      }
-    } catch (e) {
-      if (msgEl) { msgEl.textContent = 'Network error. Please try again.'; msgEl.style.display = ''; }
-    } finally {
-      if (btn) { btn.disabled = false; btn.querySelector('.btn-text').style.display = ''; btn.querySelector('.btn-spinner').style.display = 'none'; }
-    }
-  };
-
-  async function updateProfile(form) {
-    var btn      = form.querySelector('[type="submit"]');
-    var msgEl    = form.querySelector('[data-msg]');
-    var fullName = form.querySelector('[name="full_name"]')        ? form.querySelector('[name="full_name"]').value        : '';
-    var curPass  = form.querySelector('[name="current_password"]') ? form.querySelector('[name="current_password"]').value : '';
-    var newPass  = form.querySelector('[name="new_password"]')     ? form.querySelector('[name="new_password"]').value     : '';
-
-    btn.disabled = true;
-    btn.innerHTML = '<i class="ph ph-circle-notch ph-spin"></i> Saving…';
-
-    try {
-      var r = await apiFetch('/api/user-dashboard/profile.php', {
-        method: 'POST',
-        body: JSON.stringify({ full_name: fullName, password: curPass, new_password: newPass })
-      });
-
-      if (r.success) {
-        showMsg(msgEl, r.message || 'Profile updated successfully!', false);
-        var passFields = form.querySelectorAll('[name="current_password"], [name="new_password"]');
-        passFields.forEach(function (el) { el.value = ''; });
-        // Refresh to update displayed name
-        loadProfile();
-        showToast('Profile saved!', 'success');
-      } else {
-        showMsg(msgEl, r.message || 'Update failed. Please try again.', true);
-      }
-    } catch (e) {
-      showMsg(msgEl, 'Network error. Please try again.', true);
-    } finally {
-      btn.disabled = false;
-      btn.innerHTML = '<i class="ph ph-floppy-disk"></i> Save Changes';
-    }
+    sel.innerHTML = html;
+    if (current) sel.value = current;
   }
 
-  // ── Transfer ──────────────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  //  FORM HANDLERS
+  // ════════════════════════════════════════════════════════════════════════════
 
-  async function submitTransfer(form) {
-    var btn     = document.getElementById('transferBtn');
-    var msgEl   = form.querySelector('[data-msg]');
-    var email   = form.querySelector('[name="recipient_email"]');
-    var amtEl   = form.querySelector('[name="amount"]');
-
-    if (!email || !email.value.trim()) return showMsg(msgEl, 'Recipient email is required', true);
-    if (!amtEl || parseFloat(amtEl.value) < 1) return showMsg(msgEl, 'Minimum transfer is $1.00', true);
-
-    if (btn) {
-      btn.disabled = true;
-      btn.querySelector('.btn-text').style.display = 'none';
-      btn.querySelector('.btn-spinner').style.display = 'inline-flex';
-    }
-
+  async function handleSendCrypto(form) {
+    var fd = new FormData(form);
+    var sendType = qs('[name="send_type"]:checked');
+    fd.append('send_type', sendType ? sendType.value : 'address');
     try {
       var r = await apiFetch('/api/user-dashboard/wallet.php', {
         method: 'POST',
-        body: JSON.stringify({
-          action:          'transfer',
-          recipient_email: email.value.trim().toLowerCase(),
-          amount:          parseFloat(amtEl.value)
-        })
+        body: JSON.stringify(Object.fromEntries(fd))
       });
-
-      if (r.success) {
-        closeModal('modal-transfer');
-        showToast('Transfer successful!', 'success');
-        form.reset();
-        loadWallet();
-        // Also refresh overview balance
-        setText('[data-stat="balance"]', _currencySymbol + fmt(r.new_balance || 0));
-        setText('[data-wallet="balance"]', _currencySymbol + fmt(r.new_balance || 0));
-      } else {
-        showMsg(msgEl, r.message || 'Transfer failed. Please try again.', true);
-      }
+      showMsg(form, r.message || (r.success ? 'Transaction submitted' : 'Failed'), !r.success);
+      if (r.success) { form.reset(); loadOverview(); }
     } catch (e) {
-      showMsg(msgEl, 'Network error. Please try again.', true);
-    } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.querySelector('.btn-text').style.display = '';
-        btn.querySelector('.btn-spinner').style.display = 'none';
-      }
+      showMsg(form, 'Network error — please try again', true);
     }
   }
 
-  // ── Create Savings Plan ───────────────────────────────────────────────────────
-
-  async function submitCreateSavings(form) {
-    var btn       = document.getElementById('createSavingsBtn');
-    var msgEl     = form.querySelector('[data-msg]');
-    var planName  = form.querySelector('[name="plan_name"]');
-    var duration  = form.querySelector('[name="duration_months"]');
-    var target    = form.querySelector('[name="target_amount"]');
-    var rate      = form.querySelector('[name="interest_rate"]');
-
-    if (!planName || !planName.value.trim()) return showMsg(msgEl, 'Plan name is required', true);
-    if (!duration || !duration.value)        return showMsg(msgEl, 'Please select a duration', true);
-    if (!target   || parseFloat(target.value) < 10) return showMsg(msgEl, 'Minimum target amount is $10.00', true);
-
-    if (btn) {
-      btn.disabled = true;
-      btn.querySelector('.btn-text').style.display = 'none';
-      btn.querySelector('.btn-spinner').style.display = 'inline-flex';
-    }
-
+  async function handleSwapTokens(form) {
+    var fd = new FormData(form);
     try {
-      var r = await apiFetch('/api/user-dashboard/savings.php', {
+      var r = await apiFetch('/api/user-dashboard/wallet.php?action=swap', {
         method: 'POST',
-        body: JSON.stringify({
-          action:           'create',
-          plan_name:        planName.value.trim(),
-          duration_months:  parseInt(duration.value, 10),
-          target_amount:    parseFloat(target.value),
-          interest_rate:    rate ? parseFloat(rate.value) : 0
-        })
+        body: JSON.stringify(Object.fromEntries(fd))
       });
-
-      if (r.success) {
-        closeModal('modal-create-savings');
-        showToast('Savings plan created!', 'success');
-        form.reset();
-        loadSavings();
-      } else {
-        showMsg(msgEl, r.message || 'Failed to create plan. Please try again.', true);
-      }
+      showMsg(form, r.message || (r.success ? 'Swap completed' : 'Swap failed'), !r.success);
+      if (r.success) { form.reset(); loadOverview(); }
     } catch (e) {
-      showMsg(msgEl, 'Network error. Please try again.', true);
-    } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.querySelector('.btn-text').style.display = '';
-        btn.querySelector('.btn-spinner').style.display = 'none';
-      }
+      showMsg(form, 'Network error — please try again', true);
     }
   }
 
-  // ── Submit Fixed Deposit (modal) ──────────────────────────────────────────────
-
-  async function submitFixedDeposit(form) {
-    var btn    = document.getElementById('fixedDepositBtn');
-    var msgEl  = form.querySelector('[data-msg]');
-    var amount = form.querySelector('[name="amount"]');
-    var dur    = form.querySelector('[name="duration_months"]');
-
-    if (!amount || parseFloat(amount.value) < 100) return showMsg(msgEl, 'Minimum deposit is $100', true);
-    if (!dur || !dur.value) return showMsg(msgEl, 'Please select a plan', true);
-
-    if (btn) {
-      btn.disabled = true;
-      btn.querySelector('.btn-text').style.display = 'none';
-      btn.querySelector('.btn-spinner').style.display = 'inline-flex';
-    }
-
-    try {
-      var r = await apiFetch('/api/user-dashboard/deposits.php', {
-        method: 'POST',
-        body: JSON.stringify({
-          action:          'create',
-          amount:          parseFloat(amount.value),
-          duration_months: parseInt(dur.value, 10)
-        })
-      });
-
-      if (r.success) {
-        closeModal('modal-fixed-deposit');
-        showToast('Fixed deposit opened!', 'success');
-        form.reset();
-        document.getElementById('fdCalcPreview').style.display = 'none';
-        loadDeposits();
-        loadWallet();
-      } else {
-        showMsg(msgEl, r.message || 'Failed to open deposit. Please try again.', true);
-      }
-    } catch (e) {
-      showMsg(msgEl, 'Network error. Please try again.', true);
-    } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.querySelector('.btn-text').style.display = '';
-        btn.querySelector('.btn-spinner').style.display = 'none';
-      }
-    }
-  }
-
-  // ── Submit Loan Application (modal) ───────────────────────────────────────────
-
-  async function submitLoanApplication(form) {
-    var btn     = document.getElementById('loanApplicationBtn');
-    var msgEl   = form.querySelector('[data-msg]');
-    var amount  = form.querySelector('[name="loan_amount"]');
-    var dur     = form.querySelector('[name="duration_months"]');
-    var purpose = form.querySelector('[name="purpose"]');
-
-    if (!amount || parseFloat(amount.value) < 100) return showMsg(msgEl, 'Minimum loan amount is $100', true);
-    if (!dur || !dur.value) return showMsg(msgEl, 'Please select a duration', true);
-
-    if (btn) {
-      btn.disabled = true;
-      btn.querySelector('.btn-text').style.display = 'none';
-      btn.querySelector('.btn-spinner').style.display = 'inline-flex';
-    }
-
-    try {
-      var r = await apiFetch('/api/user-dashboard/loans.php', {
-        method: 'POST',
-        body: JSON.stringify({
-          action:          'apply',
-          loan_amount:     parseFloat(amount.value),
-          duration_months: parseInt(dur.value, 10),
-          purpose:         purpose ? purpose.value.trim() : ''
-        })
-      });
-
-      if (r.success) {
-        closeModal('modal-loan');
-        showToast('Loan application submitted!', 'success');
-        form.reset();
-        document.getElementById('loanCalcPreview').style.display = 'none';
-        loadLoans();
-      } else {
-        showMsg(msgEl, r.message || 'Application failed. Please try again.', true);
-      }
-    } catch (e) {
-      showMsg(msgEl, 'Network error. Please try again.', true);
-    } finally {
-      if (btn) {
-        btn.disabled = false;
-        btn.querySelector('.btn-text').style.display = '';
-        btn.querySelector('.btn-spinner').style.display = 'none';
-      }
-    }
-  }
-
-  // Legacy stubs for old inline forms (no longer used but kept for safety)
-  function submitDeposit(form) { submitFixedDeposit(form); }
-  function submitLoan(form)    { submitLoanApplication(form); }
-
-  // ── Add Funds to Savings Plan ─────────────────────────────────────────────────
-
-  function addFunds(planId, planName) {
-    var idEl    = document.getElementById('addFundsPlanId');
-    var labelEl = document.getElementById('addFundsPlanLabel');
-    var amtEl   = document.getElementById('addFundsAmount');
-    var msgEl   = document.getElementById('addFundsMsg');
-    if (idEl)    idEl.value      = planId;
-    if (labelEl) labelEl.textContent = 'Plan: ' + (planName || '—');
-    if (amtEl)   amtEl.value     = '';
-    if (msgEl)   { msgEl.style.display = 'none'; msgEl.textContent = ''; }
-    var btn = document.getElementById('addFundsBtn');
-    if (btn) { btn.disabled = false; btn.querySelector('.btn-text').style.display = ''; btn.querySelector('.btn-spinner').style.display = 'none'; }
-    openModal('modal-add-funds');
-  }
-
-  async function submitAddFunds() {
-    var planId = document.getElementById('addFundsPlanId').value;
-    var amount = parseFloat(document.getElementById('addFundsAmount').value);
-    var msgEl  = document.getElementById('addFundsMsg');
-    var btn    = document.getElementById('addFundsBtn');
-
-    if (!planId || isNaN(amount) || amount <= 0) {
-      msgEl.textContent = 'Please enter a valid amount.';
-      msgEl.style.display = '';
-      return;
-    }
-    btn.disabled = true;
-    btn.querySelector('.btn-text').style.display = 'none';
-    btn.querySelector('.btn-spinner').style.display = '';
-
-    try {
-      var r = await apiFetch('/api/user-dashboard/savings.php', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'add_funds', plan_id: parseInt(planId, 10), amount: amount })
-      });
-      if (r.success) {
-        closeModal('modal-add-funds');
-        showToast('Funds added to savings plan!');
-        loadSavings();
-        loadWallet();
-      } else {
-        msgEl.textContent = r.message || 'Failed to add funds.';
-        msgEl.style.display = '';
-        btn.disabled = false;
-        btn.querySelector('.btn-text').style.display = '';
-        btn.querySelector('.btn-spinner').style.display = 'none';
-      }
-    } catch (e) {
-      msgEl.textContent = 'Network error. Please try again.';
-      msgEl.style.display = '';
-      btn.disabled = false;
-      btn.querySelector('.btn-text').style.display = '';
-      btn.querySelector('.btn-spinner').style.display = 'none';
-    }
-  }
-
-  // ── Repay Loan ────────────────────────────────────────────────────────────────
-
-  function repayLoan(loanId, outstanding, monthly) {
-    var idEl  = document.getElementById('repayLoanId');
-    var outEl = document.getElementById('repayOutstanding');
-    var monEl = document.getElementById('repayMonthly');
-    var amtEl = document.getElementById('repayAmount');
-    var msgEl = document.getElementById('repayLoanMsg');
-    if (idEl)  idEl.value        = loanId;
-    if (outEl) outEl.textContent = _currencySymbol + fmt(outstanding || 0);
-    if (monEl) monEl.textContent = _currencySymbol + fmt(monthly || 0);
-    if (amtEl) amtEl.value       = '';
-    if (msgEl) { msgEl.style.display = 'none'; msgEl.textContent = ''; }
-    var btn = document.getElementById('repayLoanBtn');
-    if (btn) { btn.disabled = false; btn.querySelector('.btn-text').style.display = ''; btn.querySelector('.btn-spinner').style.display = 'none'; }
-    openModal('modal-repay-loan');
-  }
-
-  async function submitRepayLoan() {
-    var loanId = document.getElementById('repayLoanId').value;
-    var amount = parseFloat(document.getElementById('repayAmount').value);
-    var msgEl  = document.getElementById('repayLoanMsg');
-    var btn    = document.getElementById('repayLoanBtn');
-
-    if (!loanId || isNaN(amount) || amount <= 0) {
-      msgEl.textContent = 'Please enter a valid repayment amount.';
-      msgEl.style.display = '';
-      return;
-    }
-    btn.disabled = true;
-    btn.querySelector('.btn-text').style.display = 'none';
-    btn.querySelector('.btn-spinner').style.display = '';
-
-    try {
-      var r = await apiFetch('/api/user-dashboard/loans.php', {
-        method: 'POST',
-        body: JSON.stringify({ action: 'repay', loan_id: parseInt(loanId, 10), amount: amount })
-      });
-      if (r.success) {
-        closeModal('modal-repay-loan');
-        showToast('Repayment submitted successfully!');
-        loadLoans();
-        loadWallet();
-      } else {
-        msgEl.textContent = r.message || 'Repayment failed.';
-        msgEl.style.display = '';
-        btn.disabled = false;
-        btn.querySelector('.btn-text').style.display = '';
-        btn.querySelector('.btn-spinner').style.display = 'none';
-      }
-    } catch (e) {
-      msgEl.textContent = 'Network error. Please try again.';
-      msgEl.style.display = '';
-      btn.disabled = false;
-      btn.querySelector('.btn-text').style.display = '';
-      btn.querySelector('.btn-spinner').style.display = 'none';
-    }
-  }
-
-  // Expose for inline onclick handlers in table rows
-  window.addFunds       = addFunds;
-  window.submitAddFunds = submitAddFunds;
-  window.repayLoan      = repayLoan;
-  window.submitRepayLoan = submitRepayLoan;
-
-  // ── Delete Account ────────────────────────────────────────────────────────────
-
-  async function deleteAccount() {
-    var btn   = document.getElementById('confirmDeleteBtn');
-    var msgEl = document.getElementById('deleteMsg');
-
-    if (btn) { btn.disabled = true; btn.textContent = 'Deleting…'; }
-
+  async function handleUpdateProfile(form) {
+    var fd = new FormData(form);
     try {
       var r = await apiFetch('/api/user-dashboard/profile.php', {
         method: 'POST',
-        body: JSON.stringify({ action: 'delete' })
+        body: JSON.stringify(Object.fromEntries(fd))
       });
+      showMsg(form, r.message || (r.success ? 'Profile updated' : 'Update failed'), !r.success);
+      if (r.success) loadProfile();
+    } catch (e) {
+      showMsg(form, 'Network error — please try again', true);
+    }
+  }
 
+  async function handleChangePassword(form) {
+    var fd = new FormData(form);
+    var data = Object.fromEntries(fd);
+    if (data.new_password !== data.confirm_password) {
+      showMsg(form, 'Passwords do not match', true);
+      return;
+    }
+    try {
+      var r = await apiFetch('/api/user-dashboard/profile.php', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'change_password', current_password: data.current_password, new_password: data.new_password })
+      });
+      showMsg(form, r.message || (r.success ? 'Password updated' : 'Update failed'), !r.success);
+      if (r.success) form.reset();
+    } catch (e) {
+      showMsg(form, 'Network error — please try again', true);
+    }
+  }
+
+  async function handleSubmitKyc(form) {
+    var fd = new FormData(form);
+    try {
+      var r = await apiFetch('/api/user-dashboard/profile.php?action=kyc', {
+        method: 'POST',
+        body: fd
+      });
+      showMsg(form, r.message || (r.success ? 'Application submitted' : 'Submission failed'), !r.success);
       if (r.success) {
-        showToast('Account deleted. Redirecting…', 'info');
-        setTimeout(function () {
-          window.location.href = '/login';
-        }, 1500);
-      } else {
-        if (msgEl) showMsg(msgEl, r.message || 'Deletion failed. Please contact support.', true);
+        _user.kyc_status = 'pending';
+        loadKyc();
       }
     } catch (e) {
-      if (msgEl) showMsg(msgEl, 'Network error. Please try again.', true);
-      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="ph ph-trash"></i> Yes, Delete My Account Permanently'; }
+      showMsg(form, 'Network error — please try again', true);
     }
   }
 
-
-  // ── Savings Plans ─────────────────────────────────────────────────────────────
-
-  async function loadSavings() {
+  async function handleCreateTicket(form) {
+    var fd = new FormData(form);
     try {
-      var d = await apiFetch('/api/user-dashboard/savings.php');
-      if (!d || d.error) return;
-
-      setText('[data-stat="total-saved"]',       _currencySymbol + fmt(d.total_saved || 0));
-      setText('[data-stat="locked-in-savings"]', _currencySymbol + fmt(d.total_saved || 0));
-      setText('[data-stat="savings-count"]',      d.active_count || 0);
-
-      var tbody = qs('[data-table="savings-plans"]');
-      if (tbody) {
-        if (d.plans && d.plans.length) {
-          tbody.innerHTML = d.plans.map(function (p) {
-            var pct = p.target_amount > 0
-              ? Math.min(100, Math.round((p.current_amount / p.target_amount) * 100))
-              : 0;
-            return '<tr>'
-              + '<td>' + p.plan_name + '</td>'
-              + '<td>' + _currencySymbol + fmt(p.target_amount) + '</td>'
-              + '<td>' + _currencySymbol + fmt(p.current_amount) + '</td>'
-              + '<td>' + (p.interest_rate || '—') + '<i class="ph ph-percent"></i>&thinsp;p.a.</td>'
-              + '<td><div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div> ' + pct + '<i class="ph ph-percent"></i></td>'
-              + '<td>' + (p.duration_months || '—') + ' mo</td>'
-              + '<td>' + badge(p.status) + '</td>'
-              + '<td><button class="btn-xs btn-outline" onclick="addFunds(' + p.id + ',\'' + (p.plan_name || '').replace(/'/g, "\\'") + '\')">Add Funds</button></td>'
-              + '</tr>';
-          }).join('');
-        } else {
-          tbody.innerHTML = '<tr><td colspan="8" class="empty-row">No savings plans yet. Create your first plan above.</td></tr>';
-        }
-      }
-
-      // Also update savings overview table on Dashboard
-      var overviewTbody = qs('[data-table="savings-overview"]');
-      if (overviewTbody) {
-        if (d.plans && d.plans.length) {
-          overviewTbody.innerHTML = d.plans.slice(0, 3).map(function (p) {
-            var pct = p.target_amount > 0
-              ? Math.min(100, Math.round((p.current_amount / p.target_amount) * 100))
-              : 0;
-            return '<tr>'
-              + '<td>' + p.plan_name + '</td>'
-              + '<td>' + _currencySymbol + fmt(p.target_amount) + '</td>'
-              + '<td>' + _currencySymbol + fmt(p.current_amount) + '</td>'
-              + '<td>' + (p.interest_rate || '—') + '<i class="ph ph-percent"></i>&thinsp;p.a.</td>'
-              + '<td><div class="progress-bar"><div class="progress-fill" style="width:' + pct + '%"></div></div> ' + pct + '<i class="ph ph-percent"></i></td>'
-              + '<td>' + badge(p.status) + '</td>'
-              + '</tr>';
-          }).join('');
-        } else {
-          overviewTbody.innerHTML = '<tr><td colspan="6" class="empty-row">No active savings plans.</td></tr>';
-        }
-      }
+      var r = await apiFetch('/api/user-dashboard/dashboard.php?action=create_ticket', {
+        method: 'POST',
+        body: JSON.stringify(Object.fromEntries(fd))
+      });
+      showMsg(form, r.message || (r.success ? 'Ticket created' : 'Failed'), !r.success);
+      if (r.success) { form.reset(); document.getElementById('newTicketForm').style.display = 'none'; loadSupport(); }
     } catch (e) {
-      console.error('loadSavings:', e);
+      showMsg(form, 'Network error — please try again', true);
     }
   }
 
-  // ── Fixed Deposits ────────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  //  ROUTING
+  // ════════════════════════════════════════════════════════════════════════════
 
-  async function loadDeposits() {
-    try {
-      var d = await apiFetch('/api/user-dashboard/deposits.php');
-      if (!d || d.error) return;
-
-      setText('[data-stat="total-deposited"]',       _currencySymbol + fmt(d.total_deposited || 0));
-      setText('[data-stat="total-expected-return"]', _currencySymbol + fmt(d.total_expected_return || 0));
-
-      var tbody = qs('[data-table="fixed-deposits"]');
-      if (tbody) {
-        if (d.deposits && d.deposits.length) {
-          tbody.innerHTML = d.deposits.map(function (dep) {
-            return '<tr>'
-              + '<td>' + _currencySymbol + fmt(dep.amount) + '</td>'
-              + '<td>' + (dep.interest_rate || '—') + '<i class="ph ph-percent"></i>&thinsp;p.a.</td>'
-              + '<td>' + (dep.duration_months || '—') + ' mo</td>'
-              + '<td>' + fmtDate(dep.start_date) + '</td>'
-              + '<td>' + fmtDate(dep.maturity_date) + '</td>'
-              + '<td>' + _currencySymbol + fmt(dep.expected_return) + '</td>'
-              + '<td>' + badge(dep.status) + '</td>'
-              + '</tr>';
-          }).join('');
-        } else {
-          tbody.innerHTML = '<tr><td colspan="7" class="empty-row">No fixed deposits yet. Open your first deposit above.</td></tr>';
-        }
-      }
-    } catch (e) {
-      console.error('loadDeposits:', e);
-    }
-  }
-
-  // ── Loans ─────────────────────────────────────────────────────────────────────
-
-  async function loadLoans() {
-    try {
-      var d = await apiFetch('/api/user-dashboard/loans.php');
-      if (!d || d.error) return;
-
-      setText('[data-stat="total-borrowed"]',    _currencySymbol + fmt(d.total_borrowed || 0));
-      setText('[data-stat="remaining-balance"]', _currencySymbol + fmt(d.remaining_balance || 0));
-
-      var activeTbody = qs('[data-table="active-loans"]');
-      if (activeTbody) {
-        if (d.active_loans && d.active_loans.length) {
-          activeTbody.innerHTML = d.active_loans.map(function (l) {
-            return '<tr>'
-              + '<td>' + _currencySymbol + fmt(l.loan_amount) + '</td>'
-              + '<td>' + _currencySymbol + fmt(l.remaining_balance) + '</td>'
-              + '<td>' + _currencySymbol + fmt(l.monthly_payment) + '</td>'
-              + '<td>' + (l.interest_rate || '—') + '<i class="ph ph-percent"></i>&thinsp;p.a.</td>'
-              + '<td>' + (l.duration_months || '—') + ' mo</td>'
-              + '<td>' + badge(l.status) + '</td>'
-              + '<td><button class="btn-xs btn-primary" onclick="repayLoan(' + l.id + ',' + l.remaining_balance + ',' + l.monthly_payment + ')">Repay</button></td>'
-              + '</tr>';
-          }).join('');
-        } else {
-          activeTbody.innerHTML = '<tr><td colspan="7" class="empty-row">No active loans.</td></tr>';
-        }
-      }
-
-      var pendingTbody = qs('[data-table="pending-loans"]');
-      if (pendingTbody) {
-        if (d.pending_loans && d.pending_loans.length) {
-          pendingTbody.innerHTML = d.pending_loans.map(function (l) {
-            return '<tr>'
-              + '<td>' + _currencySymbol + fmt(l.loan_amount) + '</td>'
-              + '<td>' + (l.duration_months || '—') + ' mo</td>'
-              + '<td>' + fmtDate(l.created_at) + '</td>'
-              + '<td>' + badge(l.status) + '</td>'
-              + '</tr>';
-          }).join('');
-        } else {
-          pendingTbody.innerHTML = '<tr><td colspan="4" class="empty-row">No pending applications.</td></tr>';
-        }
-      }
-
-      // Upcoming payments on overview
-      var upcomingEl = qs('[data-list="upcoming-payments"]');
-      if (upcomingEl) {
-        if (d.active_loans && d.active_loans.length) {
-          upcomingEl.innerHTML = d.active_loans.map(function (l) {
-            return '<tr>'
-              + '<td>' + (l.purpose || '—') + '</td>'
-              + '<td><strong>' + _currencySymbol + fmt(l.monthly_payment) + '</strong></td>'
-              + '<td>' + _currencySymbol + fmt(l.remaining_balance) + '</td>'
-              + '<td>' + (l.duration_months || '—') + ' mo</td>'
-              + '<td>' + badge(l.status) + '</td>'
-              + '</tr>';
-          }).join('');
-        } else {
-          upcomingEl.innerHTML = '<tr><td colspan="5" class="empty-row">No upcoming loan payments.</td></tr>';
-        }
-      }
-    } catch (e) {
-      console.error('loadLoans:', e);
-    }
-  }
-
-  // ── Section Navigation ────────────────────────────────────────────────────────
-
-  // Page titles for each section
   var sectionTitles = {
-    overview:    'Dashboard',
-    wallet:      'Wallet',
-    profile:     'Profile',
-    investments: 'Investments',
-    commodities: 'Commodities',
-    realestate:  'Real Estate'
+    'overview':       'Overview',
+    'connect-wallet': 'Connect Wallet',
+    'send':           'Send',
+    'receive':        'Receive',
+    'swap':           'Swap',
+    'mining':         'Mining',
+    'qfs-card':       'Qfs Card',
+    'investments':    'Investments',
+    'profile':        'My Profile',
+    'kyc':            'KYC Verification',
+    'notifications':  'Notifications',
+    'security':       'Change Password',
+    '2fa':            'Two-Factor Authentication',
+    'support':        'Support'
   };
 
-  // Section loaders — key matches data-nav and data-section values
   var sectionLoaders = {
-    overview:    loadDashboard,
-    wallet:      loadWallet,
-    profile:     loadProfile,
-    investments: loadInvestments,
-    commodities: loadCommodities,
-    realestate:  loadRealEstate
+    'overview':       loadOverview,
+    'connect-wallet': loadConnectWallet,
+    'send':           loadSend,
+    'receive':        loadReceive,
+    'swap':           loadSwap,
+    'mining':         loadMining,
+    'qfs-card':       loadQfsCard,
+    'investments':    loadInvestments,
+    'profile':        loadProfile,
+    'kyc':            loadKyc,
+    'notifications':  loadNotifications,
+    'security':       loadSecurity,
+    '2fa':            load2fa,
+    'support':        loadSupport
   };
 
-  // Derive section name from current URL path
   function sectionFromPath() {
     var seg = location.pathname.split('/').filter(Boolean)[0] || '';
     if (!seg || seg === 'dashboard') return 'overview';
@@ -2379,162 +874,137 @@
   }
 
   function activateSection(name, pushState) {
-    // Show/hide sections
     document.querySelectorAll('[data-section]').forEach(function (el) {
       el.style.display = el.dataset.section === name ? 'block' : 'none';
     });
-
-    // Scroll to top after DOM change so the browser measures the correct layout
     window.scrollTo({ top: 0, behavior: 'instant' });
 
-    // Update active state on nav items (sidebar + mobile dock)
     document.querySelectorAll('[data-nav]').forEach(function (el) {
       el.classList.toggle('active', el.dataset.nav === name);
     });
 
-    // Update page title in header
     var titleEl = document.getElementById('pageTitle');
     if (titleEl) titleEl.textContent = sectionTitles[name] || name;
+    document.title = (sectionTitles[name] || name) + ' — Quantum BlocX';
 
-    // Update browser document title
-    document.title = (sectionTitles[name] || name) + ' — Qblockx';
-
-    // Push clean path URL  (/wallet, /savings, … — overview stays /dashboard)
     if (pushState !== false && history.pushState) {
       var url = (name === 'overview') ? '/dashboard' : '/' + name;
       history.pushState({ section: name }, '', url);
     }
 
-    // Load data for this section
     if (sectionLoaders[name]) sectionLoaders[name]();
-
-    // Restart both background timers for the new section
     startBackgroundRefresh(name);
   }
 
-  // ── Init ──────────────────────────────────────────────────────────────────────
+  // ════════════════════════════════════════════════════════════════════════════
+  //  INIT
+  // ════════════════════════════════════════════════════════════════════════════
 
   document.addEventListener('DOMContentLoaded', function () {
 
-    // ── Browser back / forward ─────────────────────────────────────────────
+    // ── Browser back / forward
     window.addEventListener('popstate', function (e) {
       var section = (e.state && e.state.section) ? e.state.section : sectionFromPath();
-      activateSection(section, false); // false = don't push again
+      activateSection(section, false);
     });
 
-    // ── Nav: sidebar + mobile dock link clicks ──────────────────────────────
+    // ── Nav: sidebar + mobile dock + inline data-nav links
     document.querySelectorAll('[data-nav]').forEach(function (el) {
       el.addEventListener('click', function (e) {
         e.preventDefault();
+        // Close mobile sidebar if open
+        var sidebar = document.getElementById('dashboardSidebar');
+        if (sidebar && window.innerWidth <= 899) sidebar.classList.remove('open');
         activateSection(this.dataset.nav);
       });
     });
 
-    // ── Global form submit delegation ──────────────────────────────────────
+    // ── Form submissions
     document.addEventListener('submit', function (e) {
-      var form   = e.target;
+      var form = e.target;
       var action = form.dataset.action;
       if (!action) return;
       e.preventDefault();
-
       switch (action) {
-        case 'deposit':           initiateDeposit(form);         break;
-        case 'withdraw':          submitWithdrawal(form);        break;
-        case 'transfer':          submitTransfer(form);          break;
-        case 'create-savings':    submitCreateSavings(form);     break;
-        case 'fixed-deposit':     submitFixedDeposit(form);      break;
-        case 'loan-application':  submitLoanApplication(form);   break;
-        case 'invest':            submitTradeInvestment(form);   break;
-        // legacy
-        case 'submit-deposit':    submitFixedDeposit(form);      break;
-        case 'submit-loan':       submitLoanApplication(form);   break;
-        case 'update-profile':    updateProfile(form);           break;
+        case 'send-crypto':      handleSendCrypto(form);    break;
+        case 'swap-tokens':      handleSwapTokens(form);    break;
+        case 'update-profile':   handleUpdateProfile(form); break;
+        case 'change-password':  handleChangePassword(form); break;
+        case 'submit-kyc':       handleSubmitKyc(form);     break;
+        case 'create-ticket':    handleCreateTicket(form);  break;
       }
     });
 
-    // ── Rates tabs ────────────────────────────────────────────────────────
-    document.addEventListener('click', function (e) {
-      var tab = e.target.closest('.rates-tab');
-      if (!tab) return;
-      _ratesFilter = tab.dataset.ratesFilter;
-      document.querySelectorAll('.rates-tab').forEach(function (t) {
-        t.classList.toggle('active', t.dataset.ratesFilter === _ratesFilter);
-      });
-      renderRates(_rates, _ratesFilter);
-    });
-
-    // ── Live calc: input and change events ────────────────────────────────
-    document.addEventListener('input', function (e) {
-      var id = e.target && e.target.id;
-      if (id === 'savingsTargetAmount') updateSavingsCalc();
-      if (id === 'fdAmount')            updateFdCalc();
-      if (id === 'loanAmountInput')     updateLoanCalc();
-    });
-    document.addEventListener('change', function (e) {
-      var id = e.target && e.target.id;
-      if (id === 'savingsDuration') updateSavingsCalc();
-      if (id === 'fdPlan')          updateFdCalc();
-      if (id === 'loanPlan')        updateLoanCalc();
-    });
-
-    // ── Balance visibility toggle ──────────────────────────────────────────
-    var balanceToggle = document.getElementById('balanceToggle');
-    if (balanceToggle) {
-      balanceToggle.addEventListener('click', function () {
-        var hidden = localStorage.getItem('balanceHidden') === '1';
-        localStorage.setItem('balanceHidden', hidden ? '0' : '1');
-        applyBalanceHidden(!hidden);
+    // ── Balance toggle
+    var balToggle = document.getElementById('balanceToggle');
+    if (balToggle) {
+      balToggle.addEventListener('click', function () {
+        _balanceHidden = !_balanceHidden;
+        applyBalanceHidden(_balanceHidden);
       });
     }
 
-    // ── Delete account button ──────────────────────────────────────────────
-    var deleteBtn = document.getElementById('confirmDeleteBtn');
-    if (deleteBtn) {
-      deleteBtn.addEventListener('click', deleteAccount);
+    // ── Recovery phrase toggle
+    var phraseBtn = document.getElementById('showPhraseBtn');
+    if (phraseBtn) {
+      phraseBtn.addEventListener('click', async function () {
+        var box = document.getElementById('recoveryPhraseBox');
+        if (!box) return;
+        if (box.dataset.revealed === '1') {
+          box.innerHTML = '<span class="recovery-hidden">•••••• •••••• •••••• •••••• •••••• ••••••</span>';
+          box.dataset.revealed = '0';
+          phraseBtn.innerHTML = '<i class="ph ph-eye" aria-hidden="true"></i> Show Phrase';
+        } else {
+          try {
+            var r = await apiFetch('/api/user-dashboard/profile.php?action=recovery_phrase');
+            if (r.success && r.data && r.data.phrase) {
+              box.textContent = r.data.phrase;
+              box.dataset.revealed = '1';
+              phraseBtn.innerHTML = '<i class="ph ph-eye-slash" aria-hidden="true"></i> Hide Phrase';
+            } else {
+              showToast('Unable to retrieve recovery phrase', 'error');
+            }
+          } catch (e) {
+            showToast('Network error', 'error');
+          }
+        }
+      });
     }
 
-    // ── Global delegated click: [data-copy-text] buttons ──────────────────
+    // ── Card tier selection
     document.addEventListener('click', function (e) {
-      var btn = e.target.closest('[data-copy-text]');
-      if (!btn || !btn.dataset.copyText) return;
-      copyText(btn.dataset.copyText, function (ok) {
-        if (!ok) return;
-        var orig = btn.textContent;
-        btn.textContent = 'Copied!';
-        setTimeout(function () { btn.textContent = orig; }, 2000);
+      var tierBtn = e.target.closest('[data-tier]');
+      if (tierBtn) {
+        showToast('Card request submitted for ' + tierBtn.dataset.tier, 'success');
+      }
+    });
+
+    // ── Support tabs
+    document.addEventListener('click', function (e) {
+      var tab = e.target.closest('.support-tab');
+      if (tab) {
+        document.querySelectorAll('.support-tab').forEach(function (t) { t.classList.remove('active'); });
+        tab.classList.add('active');
+        // Filter logic can be added here
+      }
+    });
+
+    // ── File upload zones (KYC)
+    document.querySelectorAll('.file-upload-zone').forEach(function (zone) {
+      var input = zone.querySelector('.file-input-hidden');
+      if (!input) return;
+      zone.addEventListener('click', function () { input.click(); });
+      input.addEventListener('change', function () {
+        if (this.files.length) {
+          zone.querySelector('span').textContent = this.files[0].name;
+          zone.querySelector('i').className = 'ph ph-check-circle';
+        }
       });
     });
 
-    // ── Modal: close on overlay background click ───────────────────────────
-    document.addEventListener('click', function (e) {
-      if (e.target.classList.contains('modal-overlay')) {
-        closeAllModals();
-      }
-    });
-
-    // ── Modal: close on ESC key ────────────────────────────────────────────
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') closeAllModals();
-    });
-
-    // ── Seed currency from cache so symbol is correct before first fetch ──
-    try {
-      var _cachedCurrency = localStorage.getItem('cv_currency');
-      if (_cachedCurrency) initCurrency(_cachedCurrency);
-    } catch(e) {}
-
-    // ── Load section from URL path, default to overview ───────────────────
-    activateSection(sectionFromPath(), false); // false = path already correct, don't re-push
-
-    // ── NOWPayments: poll for pending payment on return from invoice page ──
-    try {
-      var pendingInvoice = sessionStorage.getItem('np_invoice_id');
-      if (pendingInvoice) {
-        // Small delay so wallet section is loaded first
-        setTimeout(function () { checkPendingPayment(pendingInvoice, 0); }, 2000);
-      }
-    } catch(e) {}
-
+    // ── Initial load
+    hideLoader();
+    activateSection(sectionFromPath(), false);
   });
 
 })();

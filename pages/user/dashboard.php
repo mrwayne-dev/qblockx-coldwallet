@@ -1,9 +1,10 @@
 <?php
 /**
  * Project: qblockx
- * Page: User Dashboard — Single-Page Application
+ * Page: User Dashboard — Single-Page Application (Quantum BlocX Cold Wallet)
  *
- * Sections: overview | wallet | profile | investments | commodities | realestate
+ * Sections: overview | connect-wallet | send | receive | swap | mining | qfs-card |
+ *           investments | profile | kyc | notifications | security | 2fa | support
  * Navigation handled by assets/js/user/user-dashboard.js via path-based routing.
  */
 
@@ -12,7 +13,7 @@ require_once '../../includes/auth-guard.php';
 $pageTitle        = 'Dashboard';
 $bodyClass        = 'dashboard-body';
 $extraHeadLinks   = ['/assets/css/dashboard.css', '/assets/css/user/user-responsive.css'];
-$extraHeadScripts = ['https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js'];
+$extraHeadScripts = [];
 require_once '../../includes/head.php';
 ?>
 
@@ -26,22 +27,6 @@ require_once '../../includes/head.php';
   </div>
 </div>
 
-<!-- ── Modals ────────────────────────────────────────────────── -->
-<?php require_once '../../includes/modals/deposit-modal.php'; ?>
-<?php require_once '../../includes/modals/withdraw-modal.php'; ?>
-<?php require_once '../../includes/modals/transfer-modal.php'; ?>
-<?php require_once '../../includes/modals/create-savings-modal.php'; ?>
-<?php require_once '../../includes/modals/fixed-deposit-modal.php'; ?>
-<?php require_once '../../includes/modals/loan-modal.php'; ?>
-<?php require_once '../../includes/modals/add-funds-modal.php'; ?>
-<?php require_once '../../includes/modals/repay-loan-modal.php'; ?>
-<?php require_once '../../includes/modals/delete-account-modal.php'; ?>
-<?php require_once '../../includes/modals/invest-plan-modal.php'; ?>
-<?php require_once '../../includes/modals/invest-commodity-modal.php'; ?>
-<?php require_once '../../includes/modals/invest-realestate-modal.php'; ?>
-<?php require_once '../../includes/modals/trust-wallet-modal.php'; ?>
-<?php require_once '../../includes/modals/linked-wallets-modal.php'; ?>
-
 <!-- ── App Shell ─────────────────────────────────────────────── -->
 <div class="dashboard-wrapper">
 
@@ -53,120 +38,81 @@ require_once '../../includes/head.php';
     <header class="dashboard-header">
       <h1 class="dashboard-page-title" id="pageTitle">Dashboard</h1>
       <div class="dashboard-header-right">
+        <button class="header-icon-btn" type="button" data-nav="notifications" aria-label="Notifications">
+          <i class="ph ph-bell" aria-hidden="true"></i>
+          <span class="header-notif-dot" id="headerNotifDot" style="display:none;"></span>
+        </button>
         <div class="header-user">
           <span class="header-username" data-user="name"></span>
           <div class="avatar-circle" data-user="initial" aria-hidden="true">U</div>
         </div>
-        <a href="/api/auth/logout.php" class="header-logout" title="Sign out" aria-label="Sign out">
-          <i class="ph ph-sign-out" aria-hidden="true"></i>
-        </a>
       </div>
     </header>
 
     <!-- ════════════════════════════════════════════════════════
-         SECTION 1 — Overview / Dashboard
+         SECTION — Overview (Crypto Portfolio)
          ════════════════════════════════════════════════════════ -->
     <section data-section="overview" class="dashboard-section">
 
       <p class="section-label"><i class="ph ph-squares-four"></i> Overview</p>
 
-      <!-- Stats: 4 cards -->
-      <div class="stats-row stats-row--4">
-        <div class="stat-card">
-          <span class="stat-label">Wallet Balance</span>
-          <span class="stat-value" data-stat="balance">—</span>
-          <span class="stat-sub">Available to use</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Total Invested</span>
-          <span class="stat-value" data-stat="inv-total-invested">—</span>
-          <span class="stat-sub">Across all asset types</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Active Investments</span>
-          <span class="stat-value" data-stat="inv-active-count">—</span>
-          <span class="stat-sub">Plans, commodities &amp; real estate</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Expected Returns</span>
-          <span class="stat-value" data-stat="inv-total-returned">—</span>
-          <span class="stat-sub">At maturity across portfolio</span>
-        </div>
-      </div>
-
-      <!-- Quick Actions: 4 cards -->
-      <div class="quick-actions-row quick-actions-row--4">
-        <button class="action-card" type="button" onclick="openModal('modal-deposit')" aria-label="Deposit funds">
-          <i class="ph ph-arrow-circle-down" aria-hidden="true"></i>
-          <span class="action-card-label">Deposit</span>
-        </button>
-        <button class="action-card" type="button" onclick="openModal('modal-withdraw')" aria-label="Withdraw funds">
-          <i class="ph ph-arrow-circle-up" aria-hidden="true"></i>
-          <span class="action-card-label">Withdraw</span>
-        </button>
-        <button class="action-card" type="button" onclick="openModal('modal-transfer')" aria-label="Transfer funds">
-          <i class="ph ph-arrows-left-right" aria-hidden="true"></i>
-          <span class="action-card-label">Transfer</span>
-        </button>
-        <button class="action-card" type="button" onclick="document.querySelector('[data-nav=investments]').click()" aria-label="Invest in plans">
-          <i class="ph ph-chart-line-up" aria-hidden="true"></i>
-          <span class="action-card-label">Invest</span>
-        </button>
-      </div>
-
-      <!-- Live Market Prices + Portfolio Chart -->
-      <div class="overview-grid overview-grid--market">
-
-        <!-- Live Market Prices -->
-        <div class="table-card market-prices-card">
-          <div class="table-card-header">
-            <h3><i class="ph ph-trend-up"></i> Live Market</h3>
-            <span class="market-last-updated" id="marketLastUpdated">Updating…</span>
+      <!-- Balance Hero Card -->
+      <div class="balance-hero balance-hero--crypto">
+        <div class="balance-hero-left">
+          <span class="balance-label">Total Balance</span>
+          <div class="balance-display">
+            <span class="balance-currency">$</span>
+            <span class="balance-value" data-stat="total-balance">0.00</span>
+            <button class="balance-toggle" id="balanceToggle" type="button" aria-label="Toggle balance visibility">
+              <i class="ph ph-eye" id="balanceToggleIcon"></i>
+            </button>
           </div>
-          <div class="market-ticker" id="marketTicker">
-            <div class="market-ticker-row market-ticker--loading">
-              <span>Loading prices…</span>
-            </div>
-          </div>
+          <span class="balance-sub">Welcome back, <span data-user="name">User</span></span>
         </div>
-
-        <!-- Portfolio Allocation Chart -->
-        <div class="table-card portfolio-chart-card">
-          <div class="table-card-header">
-            <h3><i class="ph ph-chart-donut"></i> Portfolio</h3>
-            <span class="portfolio-total-value" id="portfolioTotalValue"></span>
-          </div>
-          <div class="portfolio-chart-wrap">
-            <canvas id="portfolioChart" width="180" height="180"></canvas>
-            <div id="portfolioLegend" class="portfolio-legend"></div>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Recent Transactions -->
-      <div class="table-card">
-        <div class="table-card-header">
-          <h3>Recent Transactions</h3>
-          <button type="button" class="btn-sm btn-outline"
-                  onclick="document.querySelector('[data-nav=wallet]').click()">
-            View All
+        <div class="balance-hero-actions">
+          <button class="btn-hero btn-hero--receive" type="button" data-nav="receive">
+            <i class="ph ph-arrow-down-left" aria-hidden="true"></i>
+            Receive
+          </button>
+          <button class="btn-hero btn-hero--send" type="button" data-nav="send">
+            <i class="ph ph-arrow-up-right" aria-hidden="true"></i>
+            Send
           </button>
         </div>
-        <div class="table-scroll">
-          <table class="db-table">
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody data-table="recent-transactions">
-              <tr><td colspan="4" class="empty-row">Loading…</td></tr>
-            </tbody>
-          </table>
+      </div>
+
+      <!-- Asset List -->
+      <div class="asset-list-card">
+        <div class="asset-list-header">
+          <h3>Assets</h3>
+          <span class="asset-count" id="assetCount">29 assets</span>
+        </div>
+        <div class="asset-list" id="assetList">
+          <!-- Rendered by JS — each row structure:
+          <div class="asset-row" data-symbol="BTC">
+            <div class="asset-row-left">
+              <img class="asset-icon" src="https://cdn.jsdelivr.net/gh/nickvdyck/cryptocurrency-icons/128/color/btc.png" alt="BTC" onerror="this.style.display='none';this.nextElementSibling.style.display='flex';">
+              <div class="asset-icon-fallback" style="display:none;">BTC</div>
+              <div class="asset-name-col">
+                <span class="asset-name">Bitcoin</span>
+                <span class="asset-symbol">BTC</span>
+              </div>
+            </div>
+            <div class="asset-row-center">
+              <span class="asset-price">$104,230.50</span>
+              <span class="asset-change asset-change--up">+2.35%</span>
+            </div>
+            <div class="asset-row-right">
+              <span class="asset-holding-usd">$0.00</span>
+              <span class="asset-holding-native">0.00000000 BTC</span>
+            </div>
+            <span class="asset-badge asset-badge--new">New</span>
+          </div>
+          -->
+          <div class="asset-list-loading">
+            <i class="ph ph-circle-notch ph-spin" aria-hidden="true"></i>
+            <span>Loading assets…</span>
+          </div>
         </div>
       </div>
 
@@ -174,159 +120,413 @@ require_once '../../includes/head.php';
 
 
     <!-- ════════════════════════════════════════════════════════
-         SECTION 2 — Wallet
+         SECTION — Connect Wallet
          ════════════════════════════════════════════════════════ -->
-    <section data-section="wallet" class="dashboard-section">
+    <section data-section="connect-wallet" class="dashboard-section" style="display:none;">
 
-      <p class="section-label"><i class="ph ph-wallet"></i> Wallet</p>
+      <p class="section-label"><i class="ph ph-plugs-connected"></i> Connect Wallet</p>
 
-      <!-- Balance Hero -->
-      <div class="balance-hero">
-        <span class="balance-label">Available Balance</span>
-        <div class="balance-display">
-          <span class="balance-value" data-wallet="balance">0.00</span>
-          <button class="balance-toggle" id="balanceToggle" type="button" aria-label="Toggle balance visibility">
-            <i class="ph ph-eye" id="balanceToggleIcon"></i>
-          </button>
-        </div>
-        <div class="balance-actions">
-          <button class="btn-primary" type="button" onclick="openModal('modal-deposit')">
-            <i class="ph ph-arrow-circle-down" aria-hidden="true"></i>
-            Deposit
-          </button>
-          <button class="btn-outline" type="button" onclick="openModal('modal-withdraw')">
-            <i class="ph ph-arrow-circle-up" aria-hidden="true"></i>
-            Withdraw
-          </button>
-          <button class="btn-outline" type="button" onclick="openModal('modal-transfer')">
-            <i class="ph ph-arrows-left-right" aria-hidden="true"></i>
-            Transfer
-          </button>
+      <div class="connect-wallet-hero">
+        <div class="connect-wallet-icon"><i class="ph ph-shield-check"></i></div>
+        <h2>Connect Your External Wallet</h2>
+        <p>Link an existing crypto wallet to manage your assets from within Quantum BlocX. We support 178+ wallet providers.</p>
+      </div>
+
+      <div class="wallet-search-wrap">
+        <div class="input-icon-wrap">
+          <i class="ph ph-magnifying-glass input-icon" aria-hidden="true"></i>
+          <input type="text" id="walletProviderSearch" placeholder="Search wallets…"
+                 autocomplete="off" class="wallet-search-input">
         </div>
       </div>
 
-      <!-- Wallet Info + Link Wallet -->
-      <div class="wallet-meta-row">
-
-        <!-- User Wallet Info Card -->
-        <div class="table-card wallet-info-card">
-          <div class="wallet-info-header">
-            <i class="ph ph-identification-card"></i>
-            <h3>Account Details</h3>
-          </div>
-          <div class="wallet-info-grid">
-            <div class="wallet-info-item">
-              <span class="wallet-info-label">Account Owner</span>
-              <span class="wallet-info-value" data-user="name">—</span>
-            </div>
-            <div class="wallet-info-item">
-              <span class="wallet-info-label">Email</span>
-              <span class="wallet-info-value" data-profile="email">—</span>
-            </div>
-            <div class="wallet-info-item">
-              <span class="wallet-info-label">Member Since</span>
-              <span class="wallet-info-value" data-profile="member-since">—</span>
-            </div>
-            <div class="wallet-info-item">
-              <span class="wallet-info-label">Verification</span>
-              <span class="wallet-info-value" data-profile="verified">—</span>
-            </div>
-            <div class="wallet-info-item">
-              <span class="wallet-info-label">Account Currency</span>
-              <span class="wallet-info-value"><span class="js-currency-code">USD</span></span>
-            </div>
-            <div class="wallet-info-item">
-              <span class="wallet-info-label">Account Status</span>
-              <span class="wallet-info-value" data-profile="active">—</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Trust Wallet Linking Card -->
-        <div class="table-card trust-wallet-card" id="trustWalletCard">
-          <div class="trust-wallet-inner" id="trustWalletUnlinked">
-            <div class="trust-wallet-icon" aria-hidden="true">
-              <i class="ph ph-shield-check"></i>
-            </div>
-            <div class="trust-wallet-text">
-              <h3>Link External Wallet</h3>
-              <p>Connect your external crypto wallet for faster withdrawals and on-chain verification. We support 172+ wallets.</p>
-            </div>
-            <button class="btn-primary" type="button" onclick="openModal('modal-trust-wallet')">
-              <i class="ph ph-link" aria-hidden="true"></i>
-              Link Wallet
-            </button>
-          </div>
-          <div class="trust-wallet-inner trust-wallet-linked" id="trustWalletLinked" style="display:none;">
-            <div class="trust-wallet-icon trust-wallet-icon--linked" aria-hidden="true">
-              <i class="ph ph-check-circle"></i>
-            </div>
-            <div class="trust-wallet-text">
-              <h3>External Wallet Linked <span class="badge badge-success" id="twLinkedCount">Active</span></h3>
-              <p class="tw-wallet-name-display" id="twLinkedName"></p>
-              <p class="tw-wallet-addr-display" id="twLinkedAddr"></p>
-            </div>
-            <div style="display:flex;gap:0.5rem;flex-shrink:0;">
-              <button class="btn-outline" type="button" onclick="openModal('modal-linked-wallets')">
-                <i class="ph ph-eye" aria-hidden="true"></i>
-                View Wallets
-              </button>
-              <button class="btn-outline" type="button" onclick="openModal('modal-trust-wallet')" id="twLinkAnotherBtn">
-                <i class="ph ph-plus" aria-hidden="true"></i>
-                Link Another
-              </button>
-            </div>
-          </div>
-        </div>
-
-      </div>
-
-      <!-- Transaction History with Pagination + Export -->
-      <div class="table-card">
-        <div class="table-card-header">
-          <h3>Transaction History</h3>
-          <button type="button" class="btn-sm btn-outline" id="exportTxBtn" onclick="exportTransactionsCSV()">
-            <i class="ph ph-download-simple"></i> Export CSV
-          </button>
-        </div>
-        <div class="table-scroll">
-          <table class="db-table">
-            <thead>
-              <tr>
-                <th>Type</th>
-                <th>Amount</th>
-                <th>Status</th>
-                <th>Description</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody id="txTableBody" data-table="wallet-transactions">
-              <tr><td colspan="5" class="empty-row">Loading…</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="tx-pagination" id="txPagination"></div>
-      </div>
-
-      <!-- Withdrawal Requests -->
-      <div class="table-card">
-        <div class="table-card-header">
-          <h3>Withdrawal Requests</h3>
-        </div>
-        <div data-list="withdrawals">
-          <p class="empty-text">Loading…</p>
+      <div class="wallet-provider-grid" id="walletProviderGrid">
+        <div class="asset-list-loading">
+          <i class="ph ph-circle-notch ph-spin" aria-hidden="true"></i>
+          <span>Loading wallet providers…</span>
         </div>
       </div>
 
-    </section><!-- /wallet -->
+    </section><!-- /connect-wallet -->
 
 
     <!-- ════════════════════════════════════════════════════════
-         SECTION 3 — Profile
+         SECTION — Send Crypto
          ════════════════════════════════════════════════════════ -->
-    <section data-section="profile" class="dashboard-section">
+    <section data-section="send" class="dashboard-section" style="display:none;">
 
-      <p class="section-label"><i class="ph ph-user-circle"></i> Profile</p>
+      <p class="section-label"><i class="ph ph-arrow-up-right"></i> Send</p>
+
+      <!-- Send gate: card required -->
+      <div class="gate-banner" id="sendGateBanner">
+        <i class="ph ph-warning-circle" aria-hidden="true"></i>
+        <div>
+          <strong>QFS Card Required</strong>
+          <p>You can only send out assets when you have successfully activated your QFS card.</p>
+        </div>
+        <button class="btn-primary btn-sm" type="button" data-nav="qfs-card">Get QFS Card</button>
+      </div>
+
+      <!-- Send form (hidden until card active) -->
+      <div class="send-form-wrap" id="sendFormWrap" style="display:none;">
+
+        <!-- Recipient type toggle -->
+        <div class="form-card">
+          <h3>Send To</h3>
+          <div class="send-type-toggle">
+            <label class="send-type-option">
+              <input type="radio" name="send_type" value="address" checked>
+              <span><i class="ph ph-wallet"></i> External Wallet Address</span>
+            </label>
+            <label class="send-type-option">
+              <input type="radio" name="send_type" value="internal">
+              <span><i class="ph ph-user"></i> Quantum BlocX User</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="form-card">
+          <h3>Transaction Details</h3>
+          <form data-action="send-crypto" novalidate>
+
+            <div class="form-group">
+              <label for="sendAsset">Select Asset</label>
+              <select id="sendAsset" name="currency_id" class="form-select">
+                <option value="">Choose currency…</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="sendAddressGroup">
+              <label for="sendAddress">Recipient Address</label>
+              <div class="input-icon-wrap">
+                <i class="ph ph-wallet input-icon" aria-hidden="true"></i>
+                <input type="text" id="sendAddress" name="address"
+                       placeholder="Enter wallet address" autocomplete="off">
+              </div>
+            </div>
+
+            <div class="form-group" id="sendUsernameGroup" style="display:none;">
+              <label for="sendUsername">Recipient Username or Email</label>
+              <div class="input-icon-wrap">
+                <i class="ph ph-user input-icon" aria-hidden="true"></i>
+                <input type="text" id="sendUsername" name="recipient"
+                       placeholder="Enter username or email" autocomplete="off">
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="sendAmount">Amount</label>
+              <div class="input-with-action">
+                <input type="number" id="sendAmount" name="amount"
+                       placeholder="0.00" step="any" min="0">
+                <button type="button" class="btn-inline" id="sendMaxBtn">MAX</button>
+              </div>
+              <span class="form-hint" id="sendAvailable">Available: —</span>
+            </div>
+
+            <div data-msg class="form-message" style="display:none;"></div>
+
+            <button type="submit" class="btn-primary btn-full">
+              <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i>
+              Continue
+            </button>
+          </form>
+        </div>
+      </div>
+
+    </section><!-- /send -->
+
+
+    <!-- ════════════════════════════════════════════════════════
+         SECTION — Receive Crypto
+         ════════════════════════════════════════════════════════ -->
+    <section data-section="receive" class="dashboard-section" style="display:none;">
+
+      <p class="section-label"><i class="ph ph-arrow-down-left"></i> Receive</p>
+
+      <div class="form-card">
+        <h3>Select Asset to Receive</h3>
+        <div class="form-group">
+          <select id="receiveAsset" name="currency_id" class="form-select">
+            <option value="">Choose currency…</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- QR + Address display (shown after asset selected) -->
+      <div class="receive-detail-card" id="receiveDetailCard" style="display:none;">
+
+        <div class="receive-warning">
+          <i class="ph ph-warning" aria-hidden="true"></i>
+          <span>Only send <strong id="receiveAssetName">—</strong> to this address. Sending any other asset may result in permanent loss.</span>
+        </div>
+
+        <div class="receive-qr-wrap">
+          <canvas id="receiveQrCanvas"></canvas>
+        </div>
+
+        <div class="receive-address-wrap">
+          <label>Your <span id="receiveAssetSymbol">—</span> Address</label>
+          <div class="copy-field">
+            <code id="receiveAddress" class="receive-address-text">—</code>
+            <button type="button" class="btn-copy" id="copyAddressBtn" aria-label="Copy address">
+              <i class="ph ph-copy" aria-hidden="true"></i>
+            </button>
+          </div>
+        </div>
+
+        <div class="receive-network-info">
+          <div class="network-info-row">
+            <span>Network</span>
+            <strong id="receiveNetwork">—</strong>
+          </div>
+          <div class="network-info-row">
+            <span>Expected Arrival</span>
+            <strong id="receiveConfirmations">— confirmations</strong>
+          </div>
+          <div class="network-info-row">
+            <span>Expected Unlock</span>
+            <strong id="receiveUnlock">— confirmations</strong>
+          </div>
+        </div>
+
+      </div>
+
+    </section><!-- /receive -->
+
+
+    <!-- ════════════════════════════════════════════════════════
+         SECTION — Swap Tokens
+         ════════════════════════════════════════════════════════ -->
+    <section data-section="swap" class="dashboard-section" style="display:none;">
+
+      <p class="section-label"><i class="ph ph-swap"></i> Swap</p>
+
+      <div class="swap-card">
+        <div class="swap-card-header">
+          <h3>Exchange your tokens instantly</h3>
+        </div>
+        <form data-action="swap-tokens" novalidate>
+
+          <div class="form-group">
+            <label for="swapFrom">From</label>
+            <div class="swap-input-row">
+              <select id="swapFrom" name="from_currency" class="form-select swap-select">
+                <option value="">Select…</option>
+              </select>
+              <div class="input-with-action">
+                <input type="number" id="swapFromAmount" name="from_amount"
+                       placeholder="0.00" step="any" min="0">
+                <button type="button" class="btn-inline" id="swapMaxBtn">MAX</button>
+              </div>
+            </div>
+            <span class="form-hint" id="swapFromBalance">Balance: —</span>
+          </div>
+
+          <!-- Swap direction toggle -->
+          <div class="swap-toggle-wrap">
+            <button type="button" class="swap-toggle-btn" id="swapDirectionBtn" aria-label="Swap direction">
+              <i class="ph ph-arrows-down-up" aria-hidden="true"></i>
+            </button>
+          </div>
+
+          <div class="form-group">
+            <label for="swapTo">To</label>
+            <div class="swap-input-row">
+              <select id="swapTo" name="to_currency" class="form-select swap-select">
+                <option value="">Select…</option>
+              </select>
+              <input type="number" id="swapToAmount" placeholder="0.00" readonly class="input-readonly">
+            </div>
+          </div>
+
+          <div class="swap-rate-info" id="swapRateInfo" style="display:none;">
+            <span>Rate: <strong id="swapRateDisplay">—</strong></span>
+            <span>Fee: <strong id="swapFeeDisplay">—</strong></span>
+          </div>
+
+          <div data-msg class="form-message" style="display:none;"></div>
+
+          <button type="submit" class="btn-primary btn-full">
+            <i class="ph ph-swap" aria-hidden="true"></i>
+            Swap Tokens
+          </button>
+        </form>
+      </div>
+
+      <!-- Recent Swaps -->
+      <div class="table-card">
+        <div class="table-card-header"><h3>Recent Swaps</h3></div>
+        <div class="table-scroll">
+          <table class="db-table">
+            <thead>
+              <tr><th>From</th><th>To</th><th>Rate</th><th>Date</th><th>Status</th></tr>
+            </thead>
+            <tbody data-table="recent-swaps">
+              <tr><td colspan="5" class="empty-row">No recent swaps</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section><!-- /swap -->
+
+
+    <!-- ════════════════════════════════════════════════════════
+         SECTION — Mining (Premium-Gated)
+         ════════════════════════════════════════════════════════ -->
+    <section data-section="mining" class="dashboard-section" style="display:none;">
+
+      <p class="section-label"><i class="ph ph-pickaxe"></i> Mining</p>
+
+      <div class="premium-gate" id="miningGate">
+        <div class="premium-gate-icon"><i class="ph ph-lock-simple"></i></div>
+        <h2>Crypto Mining</h2>
+        <p>Earn cryptocurrency rewards automatically. Mine different cryptocurrencies to diversify your holdings and contribute to blockchain network security.</p>
+
+        <div class="premium-benefits">
+          <div class="premium-benefit">
+            <i class="ph ph-coins" aria-hidden="true"></i>
+            <h4>Passive Income</h4>
+            <p>Earn cryptocurrency automatically without active trading</p>
+          </div>
+          <div class="premium-benefit">
+            <i class="ph ph-chart-pie-slice" aria-hidden="true"></i>
+            <h4>Portfolio Diversification</h4>
+            <p>Mine different cryptocurrencies to diversify your holdings</p>
+          </div>
+          <div class="premium-benefit">
+            <i class="ph ph-shield-checkered" aria-hidden="true"></i>
+            <h4>Support Networks</h4>
+            <p>Contribute to blockchain security and operations</p>
+          </div>
+        </div>
+
+        <div class="premium-gate-cta">
+          <p>Mining requires a <strong>VirtuElevate</strong> ($25,000) or <strong>VirtuElite</strong> ($35,000) premium card.</p>
+          <button class="btn-primary btn-lg" type="button" data-nav="qfs-card">
+            <i class="ph ph-credit-card" aria-hidden="true"></i>
+            Upgrade to Premium Card
+          </button>
+        </div>
+      </div>
+
+      <!-- Mining dashboard (shown for premium users) -->
+      <div id="miningDashboard" style="display:none;">
+        <!-- Populated by JS for premium card holders -->
+      </div>
+
+    </section><!-- /mining -->
+
+
+    <!-- ════════════════════════════════════════════════════════
+         SECTION — QFS Card
+         ════════════════════════════════════════════════════════ -->
+    <section data-section="qfs-card" class="dashboard-section" style="display:none;">
+
+      <p class="section-label"><i class="ph ph-credit-card"></i> Qfs Card</p>
+
+      <div class="qfs-card-hero">
+        <div class="qfs-card-visual">
+          <div class="virtual-card-face">
+            <div class="vc-top">
+              <span class="vc-brand">Quantum BlocX</span>
+              <span class="vc-network">Mastercard</span>
+            </div>
+            <div class="vc-number">•••• •••• •••• ••••</div>
+            <div class="vc-bottom">
+              <div>
+                <span class="vc-label">Card Holder</span>
+                <span class="vc-value" data-user="name">—</span>
+              </div>
+              <div>
+                <span class="vc-label">Expires</span>
+                <span class="vc-value">—/—</span>
+              </div>
+            </div>
+            <div class="vc-badge">The QFS Virtual Card® — The XRP Edition</div>
+          </div>
+        </div>
+        <div class="qfs-card-info">
+          <h2>The QFS Virtual Card®</h2>
+          <p>Issued by WebBank. Up to 4% cashback on purchases. No annual fee.</p>
+          <button class="btn-primary btn-lg" type="button" id="requestCardBtn">
+            <i class="ph ph-credit-card" aria-hidden="true"></i>
+            Request New Card
+          </button>
+        </div>
+      </div>
+
+      <!-- Card Tiers -->
+      <h3 class="section-heading" style="margin-top:3.2rem;">Choose Your Tier</h3>
+      <div class="card-tier-grid">
+        <div class="card-tier">
+          <div class="card-tier-header">
+            <h4>VirtuElevate</h4>
+            <span class="card-tier-price">$25,000</span>
+          </div>
+          <ul class="card-tier-features">
+            <li><i class="ph ph-check-circle"></i> Mining Access</li>
+            <li><i class="ph ph-check-circle"></i> Premium Transaction Limits</li>
+            <li><i class="ph ph-check-circle"></i> Reduced Exchange Fees</li>
+            <li><i class="ph ph-x-circle"></i> <span class="tier-disabled">Zero Exchange Fees</span></li>
+            <li><i class="ph ph-x-circle"></i> <span class="tier-disabled">Priority Support</span></li>
+          </ul>
+          <button class="btn-primary btn-full" type="button" data-tier="VirtuElevate">Select VirtuElevate</button>
+        </div>
+        <div class="card-tier card-tier--elite">
+          <div class="card-tier-badge">Most Popular</div>
+          <div class="card-tier-header">
+            <h4>VirtuElite</h4>
+            <span class="card-tier-price">$35,000</span>
+          </div>
+          <ul class="card-tier-features">
+            <li><i class="ph ph-check-circle"></i> Mining Access</li>
+            <li><i class="ph ph-check-circle"></i> Highest Transaction Limits</li>
+            <li><i class="ph ph-check-circle"></i> Zero Exchange Fees</li>
+            <li><i class="ph ph-check-circle"></i> Investment Access</li>
+            <li><i class="ph ph-check-circle"></i> Priority Support</li>
+          </ul>
+          <button class="btn-primary btn-full" type="button" data-tier="VirtuElite">Select VirtuElite</button>
+        </div>
+      </div>
+
+    </section><!-- /qfs-card -->
+
+
+    <!-- ════════════════════════════════════════════════════════
+         SECTION — Investments (Premium-Gated)
+         ════════════════════════════════════════════════════════ -->
+    <section data-section="investments" class="dashboard-section" style="display:none;">
+
+      <p class="section-label"><i class="ph ph-chart-line-up"></i> Investments</p>
+
+      <div class="premium-gate" id="investmentsGate">
+        <div class="premium-gate-icon"><i class="ph ph-lock-simple"></i></div>
+        <h2>Investments</h2>
+        <p>Earn passive returns on your cryptocurrency holdings. This feature is exclusively available to premium card holders.</p>
+        <div class="premium-gate-cta">
+          <p>Investments require a <strong>VirtuElevate</strong> ($25,000) or <strong>VirtuElite</strong> ($35,000) premium card.</p>
+          <button class="btn-primary btn-lg" type="button" data-nav="qfs-card">
+            <i class="ph ph-credit-card" aria-hidden="true"></i>
+            Upgrade to Premium Card
+          </button>
+        </div>
+      </div>
+
+      <div id="investmentsDashboard" style="display:none;">
+        <!-- Populated by JS for premium card holders -->
+      </div>
+
+    </section><!-- /investments -->
+
+
+    <!-- ════════════════════════════════════════════════════════
+         SECTION — Profile
+         ════════════════════════════════════════════════════════ -->
+    <section data-section="profile" class="dashboard-section" style="display:none;">
+
+      <p class="section-label"><i class="ph ph-user-circle"></i> My Profile</p>
 
       <!-- Profile Header Card -->
       <div class="profile-header-card">
@@ -338,17 +538,16 @@ require_once '../../includes/head.php';
             <span class="badge badge-muted">
               Member since: <span data-profile="member-since">—</span>
             </span>
-            <span class="badge badge-muted" data-profile="verified">—</span>
-            <span class="badge badge-muted" data-profile="active">—</span>
+            <span class="badge" data-profile="verified">—</span>
+            <span class="badge" data-profile="kyc-status">KYC: Unverified</span>
           </div>
         </div>
       </div>
 
-      <!-- Edit Profile Form -->
+      <!-- Personal Info Form -->
       <div class="form-card">
         <h3>Personal Information</h3>
         <form data-action="update-profile" novalidate>
-
           <div class="form-group">
             <label for="profileFullName">Full Name</label>
             <div class="input-icon-wrap">
@@ -357,7 +556,6 @@ require_once '../../includes/head.php';
                      placeholder="Your full name" autocomplete="name">
             </div>
           </div>
-
           <div class="form-group">
             <label for="profileEmail">Email Address</label>
             <div class="input-icon-wrap">
@@ -366,358 +564,305 @@ require_once '../../includes/head.php';
                      placeholder="your@email.com" autocomplete="email" readonly class="input-readonly">
             </div>
           </div>
-
-          <hr class="form-divider">
-
-          <div class="password-section">
-            <h4>Change Password</h4>
-            <p class="form-hint">Leave both fields blank to keep your current password.</p>
-
-            <div class="form-group">
-              <label for="profileCurPass">Current Password</label>
-              <div class="input-icon-wrap">
-                <i class="ph ph-lock-simple input-icon" aria-hidden="true"></i>
-                <input type="password" id="profileCurPass" name="current_password"
-                       placeholder="Current password" autocomplete="current-password">
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label for="profileNewPass">New Password</label>
-              <div class="input-icon-wrap">
-                <i class="ph ph-lock-simple input-icon" aria-hidden="true"></i>
-                <input type="password" id="profileNewPass" name="new_password"
-                       placeholder="Min. 8 characters" autocomplete="new-password">
-              </div>
-            </div>
-          </div>
-
           <div data-msg class="form-message" style="display:none;"></div>
-
           <button type="submit" class="btn-primary">
             <i class="ph ph-floppy-disk" aria-hidden="true"></i>
             Save Changes
           </button>
-
         </form>
       </div>
 
-      <!-- Danger Zone -->
-      <div class="danger-zone">
-        <h3>
-          <i class="ph ph-warning" aria-hidden="true"></i>
-          Danger Zone
-        </h3>
-        <p>Permanently delete your account and all associated data. This action cannot be undone.</p>
-        <button class="btn-danger" type="button" onclick="openModal('modal-delete-account')">
-          <i class="ph ph-trash" aria-hidden="true"></i>
-          Delete My Account
+      <!-- Recovery Phrase -->
+      <div class="form-card">
+        <h3><i class="ph ph-key"></i> Recovery Phrase</h3>
+        <p class="form-hint">The Recovery Phrase is the Master Key to your funds. Never share it with anyone else.</p>
+        <div class="recovery-phrase-box" id="recoveryPhraseBox">
+          <span class="recovery-hidden">•••••• •••••• •••••• •••••• •••••• ••••••</span>
+        </div>
+        <button class="btn-outline" type="button" id="showPhraseBtn">
+          <i class="ph ph-eye" aria-hidden="true"></i>
+          Show Phrase
         </button>
+      </div>
+
+      <!-- IP + Session Info -->
+      <div class="form-card">
+        <h3>Session Information</h3>
+        <div class="wallet-info-grid">
+          <div class="wallet-info-item">
+            <span class="wallet-info-label">Current IP</span>
+            <span class="wallet-info-value" data-profile="ip">—</span>
+          </div>
+          <div class="wallet-info-item">
+            <span class="wallet-info-label">Account Status</span>
+            <span class="wallet-info-value" data-profile="active">—</span>
+          </div>
+        </div>
       </div>
 
     </section><!-- /profile -->
 
+
     <!-- ════════════════════════════════════════════════════════
-         SECTION 4 — Investments
+         SECTION — KYC Verification
          ════════════════════════════════════════════════════════ -->
-    <section data-section="investments" class="dashboard-section">
+    <section data-section="kyc" class="dashboard-section" style="display:none;">
 
-      <p class="section-label"><i class="ph ph-chart-line-up"></i> Investments</p>
+      <p class="section-label"><i class="ph ph-identification-card"></i> KYC Verification</p>
 
-      <div class="stats-row stats-row--3">
-        <div class="stat-card">
-          <span class="stat-label">Total Invested</span>
-          <span class="stat-value" data-stat="plan-total-invested">—</span>
-          <span class="stat-sub">Across all active plans</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Expected Return</span>
-          <span class="stat-value" data-stat="plan-total-returned">—</span>
-          <span class="stat-sub">At plan maturity</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Active Plans</span>
-          <span class="stat-value" data-stat="plan-active-count">—</span>
-          <span class="stat-sub">Currently running</span>
+      <div class="kyc-status-banner" id="kycStatusBanner">
+        <i class="ph ph-info"></i>
+        <span>KYC Status: <strong id="kycStatusText">Unverified</strong></span>
+      </div>
+
+      <div class="form-card" id="kycForm">
+        <h3>Identity Verification</h3>
+        <p class="form-hint">Complete your KYC to unlock sending, card requests, and full platform access. You can't edit these details once submitted.</p>
+
+        <form data-action="submit-kyc" novalidate>
+
+          <h4>Section 1 — Personal Details</h4>
+          <div class="form-row form-row--2">
+            <div class="form-group">
+              <label for="kycFirstName">First Name</label>
+              <input type="text" id="kycFirstName" name="first_name" placeholder="First name" required>
+            </div>
+            <div class="form-group">
+              <label for="kycLastName">Last Name</label>
+              <input type="text" id="kycLastName" name="last_name" placeholder="Last name" required>
+            </div>
+          </div>
+          <div class="form-row form-row--2">
+            <div class="form-group">
+              <label for="kycEmail">Email</label>
+              <input type="email" id="kycEmail" name="email" placeholder="Email address" required>
+            </div>
+            <div class="form-group">
+              <label for="kycPhone">Phone Number</label>
+              <input type="tel" id="kycPhone" name="phone" placeholder="Phone number" required>
+            </div>
+          </div>
+          <div class="form-row form-row--2">
+            <div class="form-group">
+              <label for="kycDob">Date of Birth</label>
+              <input type="date" id="kycDob" name="date_of_birth" required>
+            </div>
+            <div class="form-group">
+              <label for="kycSocial">Social Handle (optional)</label>
+              <input type="text" id="kycSocial" name="social_handle" placeholder="Twitter / Instagram">
+            </div>
+          </div>
+
+          <h4>Section 2 — Your Address</h4>
+          <div class="form-group">
+            <label for="kycAddress">Address Line</label>
+            <input type="text" id="kycAddress" name="address_line" placeholder="Street address" required>
+          </div>
+          <div class="form-row form-row--3">
+            <div class="form-group">
+              <label for="kycCity">City</label>
+              <input type="text" id="kycCity" name="city" placeholder="City" required>
+            </div>
+            <div class="form-group">
+              <label for="kycState">State</label>
+              <input type="text" id="kycState" name="state" placeholder="State" required>
+            </div>
+            <div class="form-group">
+              <label for="kycNationality">Nationality</label>
+              <input type="text" id="kycNationality" name="nationality" placeholder="Nationality" required>
+            </div>
+          </div>
+
+          <h4>Section 3 — Document Verification</h4>
+          <div class="form-group">
+            <label for="kycDocType">Document Type</label>
+            <select id="kycDocType" name="document_type" class="form-select" required>
+              <option value="">Select document…</option>
+              <option value="drivers_license">Driver's License</option>
+              <option value="passport">Passport</option>
+              <option value="national_id">National ID</option>
+            </select>
+          </div>
+          <div class="form-row form-row--2">
+            <div class="form-group">
+              <label>Document Front</label>
+              <div class="file-upload-zone" id="kycFrontZone">
+                <i class="ph ph-upload-simple"></i>
+                <span>Click or drag to upload front</span>
+                <input type="file" name="document_front" accept="image/*" class="file-input-hidden">
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Document Back</label>
+              <div class="file-upload-zone" id="kycBackZone">
+                <i class="ph ph-upload-simple"></i>
+                <span>Click or drag to upload back</span>
+                <input type="file" name="document_back" accept="image/*" class="file-input-hidden">
+              </div>
+            </div>
+          </div>
+
+          <label class="checkbox-label">
+            <input type="checkbox" name="terms" required>
+            <span>I confirm that the information provided is accurate and I agree to the verification terms.</span>
+          </label>
+
+          <div data-msg class="form-message" style="display:none;"></div>
+
+          <button type="submit" class="btn-primary btn-full">
+            <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i>
+            Submit Application
+          </button>
+        </form>
+      </div>
+
+    </section><!-- /kyc -->
+
+
+    <!-- ════════════════════════════════════════════════════════
+         SECTION — Notifications
+         ════════════════════════════════════════════════════════ -->
+    <section data-section="notifications" class="dashboard-section" style="display:none;">
+
+      <p class="section-label"><i class="ph ph-bell"></i> Notifications</p>
+
+      <div class="notif-tabs">
+        <button class="notif-tab active" data-tab="activity">Activity</button>
+      </div>
+
+      <div class="notif-list" id="notifList">
+        <div class="empty-state">
+          <i class="ph ph-bell-slash" aria-hidden="true"></i>
+          <p>No notifications</p>
         </div>
       </div>
 
-      <!-- How to Invest — 3-step guide -->
-      <div class="how-to-invest">
-        <h2 class="section-heading">Start Investing in 3 Steps</h2>
-        <div class="how-to-steps">
-          <div class="how-step">
-            <div class="how-step-num">1</div>
-            <div class="how-step-body">
-              <h4>Fund Your Wallet</h4>
-              <p>Deposit crypto or fiat into your Qblockx wallet to have capital ready.</p>
+    </section><!-- /notifications -->
+
+
+    <!-- ════════════════════════════════════════════════════════
+         SECTION — Security (Change Password)
+         ════════════════════════════════════════════════════════ -->
+    <section data-section="security" class="dashboard-section" style="display:none;">
+
+      <p class="section-label"><i class="ph ph-shield-check"></i> Change Password</p>
+
+      <div class="form-card">
+        <h3>Update Your Password</h3>
+        <form data-action="change-password" novalidate>
+          <div class="form-group">
+            <label for="secOldPass">Old Password</label>
+            <div class="input-icon-wrap">
+              <i class="ph ph-lock-simple input-icon" aria-hidden="true"></i>
+              <input type="password" id="secOldPass" name="current_password"
+                     placeholder="Current password" autocomplete="current-password" required>
             </div>
           </div>
-          <div class="how-step-arrow"><i class="ph ph-arrow-right"></i></div>
-          <div class="how-step">
-            <div class="how-step-num">2</div>
-            <div class="how-step-body">
-              <h4>Choose a Plan</h4>
-              <p>Pick from Starter or Elite investment tiers based on your risk appetite and horizon.</p>
+          <div class="form-group">
+            <label for="secNewPass">New Password</label>
+            <div class="input-icon-wrap">
+              <i class="ph ph-lock-simple input-icon" aria-hidden="true"></i>
+              <input type="password" id="secNewPass" name="new_password"
+                     placeholder="Min. 8 characters" autocomplete="new-password" required>
             </div>
           </div>
-          <div class="how-step-arrow"><i class="ph ph-arrow-right"></i></div>
-          <div class="how-step">
-            <div class="how-step-num">3</div>
-            <div class="how-step-body">
-              <h4>Earn Returns</h4>
-              <p>Your capital grows automatically. Track performance and receive payouts at maturity.</p>
+          <div class="form-group">
+            <label for="secConfirmPass">Confirm New Password</label>
+            <div class="input-icon-wrap">
+              <i class="ph ph-lock-simple input-icon" aria-hidden="true"></i>
+              <input type="password" id="secConfirmPass" name="confirm_password"
+                     placeholder="Confirm new password" autocomplete="new-password" required>
             </div>
           </div>
+          <div data-msg class="form-message" style="display:none;"></div>
+          <button type="submit" class="btn-primary">
+            <i class="ph ph-floppy-disk" aria-hidden="true"></i>
+            Reset Password
+          </button>
+        </form>
+      </div>
+
+    </section><!-- /security -->
+
+
+    <!-- ════════════════════════════════════════════════════════
+         SECTION — 2FA Authentication
+         ════════════════════════════════════════════════════════ -->
+    <section data-section="2fa" class="dashboard-section" style="display:none;">
+
+      <p class="section-label"><i class="ph ph-shield-check"></i> Two-Factor Authentication</p>
+
+      <div class="form-card tfa-card">
+        <div class="tfa-icon"><i class="ph ph-fingerprint"></i></div>
+        <h3>Two-Factor Authentication</h3>
+        <p>Configure two-factor authentication and other security settings for your account.</p>
+        <div class="tfa-status" id="tfaStatus">
+          <span class="badge badge-muted">Status: <strong id="tfaStatusText">Disabled</strong></span>
         </div>
-        <div class="how-to-cta">
-          <button class="btn-primary btn-lg" type="button" onclick="openModal('modal-invest-plan')">
-            <i class="ph ph-rocket-launch" aria-hidden="true"></i>
-            Start Investing Now
+        <button class="btn-primary" type="button" id="manage2faBtn">
+          <i class="ph ph-gear" aria-hidden="true"></i>
+          Manage Two-Factor Authentication
+        </button>
+      </div>
+
+    </section><!-- /2fa -->
+
+
+    <!-- ════════════════════════════════════════════════════════
+         SECTION — Support Tickets
+         ════════════════════════════════════════════════════════ -->
+    <section data-section="support" class="dashboard-section" style="display:none;">
+
+      <p class="section-label"><i class="ph ph-headset"></i> Support</p>
+
+      <div class="support-header-row">
+        <div class="support-tabs">
+          <button class="support-tab active" data-filter="all">All Tickets</button>
+          <button class="support-tab" data-filter="open">Open</button>
+          <button class="support-tab" data-filter="closed">Closed</button>
+        </div>
+        <button class="btn-primary" type="button" id="newTicketBtn">
+          <i class="ph ph-plus" aria-hidden="true"></i>
+          New Ticket
+        </button>
+      </div>
+
+      <div class="ticket-list" id="ticketList">
+        <div class="empty-state">
+          <i class="ph ph-ticket" aria-hidden="true"></i>
+          <h3>No tickets found</h3>
+          <p>You haven't created any support tickets yet.</p>
+          <button class="btn-primary" type="button" id="createFirstTicketBtn">
+            <i class="ph ph-plus" aria-hidden="true"></i>
+            Create Your First Ticket
           </button>
         </div>
       </div>
 
-      <!-- Investment Plans Preview -->
-      <div id="invPlansPreview"></div>
-
-      <!-- My Investments Table -->
-      <div class="table-card">
-        <div class="table-card-header"><h3>My Investments</h3></div>
-        <div class="table-scroll">
-          <table class="db-table">
-            <thead>
-              <tr>
-                <th>Plan</th><th>Tier</th><th>Amount</th><th>Yield</th>
-                <th>Start</th><th>End</th><th>Expected Return</th><th>Status</th>
-              </tr>
-            </thead>
-            <tbody data-table="inv-my-investments">
-              <tr><td colspan="8" class="empty-row">Loading…</td></tr>
-            </tbody>
-          </table>
-        </div>
+      <!-- New Ticket Form (hidden by default) -->
+      <div class="form-card" id="newTicketForm" style="display:none;">
+        <h3>New Support Ticket</h3>
+        <form data-action="create-ticket" novalidate>
+          <div class="form-group">
+            <label for="ticketSubject">Subject</label>
+            <input type="text" id="ticketSubject" name="subject" placeholder="Brief description of your issue" required>
+          </div>
+          <div class="form-group">
+            <label for="ticketBody">Message</label>
+            <textarea id="ticketBody" name="body" rows="5" placeholder="Describe your issue in detail…" required></textarea>
+          </div>
+          <div data-msg class="form-message" style="display:none;"></div>
+          <div class="form-actions">
+            <button type="button" class="btn-outline" id="cancelTicketBtn">Cancel</button>
+            <button type="submit" class="btn-primary">
+              <i class="ph ph-paper-plane-tilt" aria-hidden="true"></i>
+              Submit Ticket
+            </button>
+          </div>
+        </form>
       </div>
 
-      <!-- Performance Insights -->
-      <div class="perf-insights">
-        <h3 class="section-heading">Performance Insights</h3>
-        <div class="perf-insights-grid">
-          <div class="perf-insight-card">
-            <i class="ph ph-clock-countdown"></i>
-            <div>
-              <span class="perf-insight-label">Avg. Plan Duration</span>
-              <span class="perf-insight-value" id="avgPlanDuration">—</span>
-            </div>
-          </div>
-          <div class="perf-insight-card">
-            <i class="ph ph-chart-bar"></i>
-            <div>
-              <span class="perf-insight-label">Best Yield Rate</span>
-              <span class="perf-insight-value" id="bestYieldRate">—</span>
-            </div>
-          </div>
-          <div class="perf-insight-card">
-            <i class="ph ph-currency-dollar"></i>
-            <div>
-              <span class="perf-insight-label">Est. Monthly Earnings</span>
-              <span class="perf-insight-value" id="estMonthlyEarnings">—</span>
-            </div>
-          </div>
-          <div class="perf-insight-card">
-            <i class="ph ph-shield-check"></i>
-            <div>
-              <span class="perf-insight-label">Portfolio Health</span>
-              <span class="perf-insight-value perf-insight--good">Excellent</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-    </section><!-- /investments -->
-
-    <!-- ════════════════════════════════════════════════════════
-         SECTION 5 — Commodities
-         ════════════════════════════════════════════════════════ -->
-    <section data-section="commodities" class="dashboard-section">
-
-      <p class="section-label"><i class="ph ph-coin"></i> Commodities</p>
-
-      <div class="stats-row stats-row--3">
-        <div class="stat-card">
-          <span class="stat-label">Total Invested</span>
-          <span class="stat-value" data-stat="com-total-invested">—</span>
-          <span class="stat-sub">Across all positions</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Expected Return</span>
-          <span class="stat-value" data-stat="com-total-returned">—</span>
-          <span class="stat-sub">At maturity</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Active Positions</span>
-          <span class="stat-value" data-stat="com-active-count">—</span>
-          <span class="stat-sub">Currently open</span>
-        </div>
-      </div>
-
-      <!-- Live Market Prices — Bybit-style ticker -->
-      <div class="table-card">
-        <div class="table-card-header">
-          <h3><i class="ph ph-trend-up"></i> Live Crypto Prices</h3>
-          <span class="market-last-updated" id="comMarketUpdated">Updating…</span>
-        </div>
-        <div class="com-market-table-wrap">
-          <table class="db-table market-table">
-            <thead>
-              <tr>
-                <th>Asset</th>
-                <th>Price (USD)</th>
-                <th>24h Change</th>
-                <th>Market Cap</th>
-                <th>Volume (24h)</th>
-                <th></th>
-              </tr>
-            </thead>
-            <tbody id="comMarketTbody">
-              <tr><td colspan="6" class="empty-row">Loading prices…</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="section-heading-row">
-        <h2 class="section-heading">My Positions</h2>
-        <button class="btn-primary" type="button" onclick="openModal('modal-invest-commodity')">
-          <i class="ph ph-plus" aria-hidden="true"></i> Open Position
-        </button>
-      </div>
-
-      <div class="table-card">
-        <div class="table-card-header"><h3>Active Positions</h3></div>
-        <div class="table-scroll">
-          <table class="db-table">
-            <thead>
-              <tr>
-                <th>Asset</th><th>Amount</th><th>Yield</th>
-                <th>Start</th><th>End</th><th>Expected Return</th><th>Status</th>
-              </tr>
-            </thead>
-            <tbody data-table="com-my-positions">
-              <tr><td colspan="7" class="empty-row">Loading…</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-    </section><!-- /commodities -->
-
-    <!-- ════════════════════════════════════════════════════════
-         SECTION 6 — Real Estate
-         ════════════════════════════════════════════════════════ -->
-    <section data-section="realestate" class="dashboard-section">
-
-      <p class="section-label"><i class="ph ph-buildings"></i> Real Estate</p>
-
-      <div class="stats-row stats-row--3">
-        <div class="stat-card">
-          <span class="stat-label">Total Invested</span>
-          <span class="stat-value" data-stat="re-total-invested">—</span>
-          <span class="stat-sub">Across all properties</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Expected Return</span>
-          <span class="stat-value" data-stat="re-total-returned">—</span>
-          <span class="stat-sub">At maturity</span>
-        </div>
-        <div class="stat-card">
-          <span class="stat-label">Active Properties</span>
-          <span class="stat-value" data-stat="re-active-count">—</span>
-          <span class="stat-sub">Currently held</span>
-        </div>
-      </div>
-
-      <!-- Real Estate Market Overview -->
-      <div class="re-market-overview">
-        <h3 class="section-heading">Global Real Estate Market</h3>
-        <div class="re-market-grid">
-          <div class="re-market-card">
-            <div class="re-market-flag">🇺🇸</div>
-            <div class="re-market-info">
-              <span class="re-market-region">United States</span>
-              <span class="re-market-index">S&amp;P Case-Shiller HPI</span>
-              <span class="re-market-value re-up">+4.2% YoY</span>
-            </div>
-          </div>
-          <div class="re-market-card">
-            <div class="re-market-flag">🇬🇧</div>
-            <div class="re-market-info">
-              <span class="re-market-region">United Kingdom</span>
-              <span class="re-market-index">Nationwide HPI</span>
-              <span class="re-market-value re-up">+3.9% YoY</span>
-            </div>
-          </div>
-          <div class="re-market-card">
-            <div class="re-market-flag">🇦🇪</div>
-            <div class="re-market-info">
-              <span class="re-market-region">UAE (Dubai)</span>
-              <span class="re-market-index">REIDIN Property Index</span>
-              <span class="re-market-value re-up">+8.1% YoY</span>
-            </div>
-          </div>
-          <div class="re-market-card">
-            <div class="re-market-flag">🇩🇪</div>
-            <div class="re-market-info">
-              <span class="re-market-region">Germany</span>
-              <span class="re-market-index">Empirica Regio Index</span>
-              <span class="re-market-value re-down">−1.3% YoY</span>
-            </div>
-          </div>
-          <div class="re-market-card">
-            <div class="re-market-flag">🇸🇬</div>
-            <div class="re-market-info">
-              <span class="re-market-region">Singapore</span>
-              <span class="re-market-index">URA Price Index</span>
-              <span class="re-market-value re-up">+6.5% YoY</span>
-            </div>
-          </div>
-          <div class="re-market-card">
-            <div class="re-market-flag">🇨🇦</div>
-            <div class="re-market-info">
-              <span class="re-market-region">Canada</span>
-              <span class="re-market-index">CREA MLS HPI</span>
-              <span class="re-market-value re-up">+2.1% YoY</span>
-            </div>
-          </div>
-        </div>
-        <p class="re-market-disclaimer">Market data is indicative. Qblockx real estate returns are based on contracted plan terms.</p>
-      </div>
-
-      <div class="section-heading-row">
-        <h2 class="section-heading">My Properties</h2>
-        <button class="btn-primary" type="button" onclick="openModal('modal-invest-realestate')">
-          <i class="ph ph-plus" aria-hidden="true"></i> Invest
-        </button>
-      </div>
-
-      <div class="table-card">
-        <div class="table-card-header"><h3>Active Holdings</h3></div>
-        <div class="table-scroll">
-          <table class="db-table">
-            <thead>
-              <tr>
-                <th>Property</th><th>Amount</th><th>Yield</th>
-                <th>Start</th><th>End</th><th>Expected Return</th><th>Status</th>
-              </tr>
-            </thead>
-            <tbody data-table="re-my-investments">
-              <tr><td colspan="7" class="empty-row">Loading…</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-    </section><!-- /realestate -->
+    </section><!-- /support -->
 
   </main><!-- .dashboard-main -->
 </div><!-- .dashboard-wrapper -->

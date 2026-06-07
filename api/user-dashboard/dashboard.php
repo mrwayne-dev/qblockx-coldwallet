@@ -1,7 +1,8 @@
 <?php
 /**
- * Project: qblockx
- * API: user-dashboard/dashboard.php — Overview stats
+ * Quantum BlocX — API: user-dashboard/dashboard.php
+ * GET  → Overview data (user, card_tier, notifications)
+ * POST → action=create_ticket
  */
 
 require_once '../../config/database.php';
@@ -9,97 +10,113 @@ require_once '../../api/utilities/auth-check.php';
 header('Content-Type: application/json');
 
 requireAuth();
-$user = getAuthUser();
+$auth = getAuthUser();
 
 try {
     $db  = Database::getInstance()->getConnection();
-    $uid = $user['id'];
+    $uid = $auth['id'];
 
-    // Wallet balance + currency
-    $walletStmt = $db->prepare("SELECT balance, currency FROM wallets WHERE user_id = :uid");
-    $walletStmt->execute(['uid' => $uid]);
-    $wallet   = $walletStmt->fetch();
-    $balance  = $wallet ? (float) $wallet['balance'] : 0.0;
-    $currency = $wallet['currency'] ?? 'USD';
+    // ── POST: action dispatcher ──────────────────────────────────────
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $input  = json_decode(file_get_contents('php://input'), true) ?: [];
+        $action = $_GET['action'] ?? ($input['action'] ?? '');
 
-    // Aggregate investment stats across all 3 types (all-time total invested)
-    // Named params must be unique per statement when emulated prepares are off
-    $invAggStmt = $db->prepare(
-        "SELECT
-           (SELECT COALESCE(SUM(amount),0) FROM plan_investments       WHERE user_id = :uid1)
-         + (SELECT COALESCE(SUM(amount),0) FROM commodity_investments  WHERE user_id = :uid2)
-         + (SELECT COALESCE(SUM(amount),0) FROM realestate_investments WHERE user_id = :uid3)
-         AS total_invested_all"
-    );
-    $invAggStmt->execute(['uid1' => $uid, 'uid2' => $uid, 'uid3' => $uid]);
-    $total_invested_all = (float) $invAggStmt->fetchColumn();
+        if ($action === 'create_ticket') {
+            $subject = trim($input['subject'] ?? '');
+            $body    = trim($input['body'] ?? '');
+            if (!$subject || !$body) {
+                echo json_encode(['success' => false, 'message' => 'Subject and message are required']);
+                exit;
+            }
+            // Generate ticket reference
+            $countStmt = $db->query("SELECT COUNT(*) FROM support_tickets");
+            $ticketNum = (int) $countStmt->fetchColumn() + 1;
+            $ticketRef = 'TKT-' . str_pad($ticketNum, 6, '0', STR_PAD_LEFT);
 
-    $activeAggStmt = $db->prepare(
-        "SELECT
-           (SELECT COUNT(*) FROM plan_investments       WHERE user_id = :uid4 AND status = 'active')
-         + (SELECT COUNT(*) FROM commodity_investments  WHERE user_id = :uid5 AND status = 'active')
-         + (SELECT COUNT(*) FROM realestate_investments WHERE user_id = :uid6 AND status = 'active')
-         AS active_count_all"
-    );
-    $activeAggStmt->execute(['uid4' => $uid, 'uid5' => $uid, 'uid6' => $uid]);
-    $active_count_all = (int) $activeAggStmt->fetchColumn();
+            $stmt = $db->prepare(
+                "INSERT INTO support_tickets (user_id, ticket_ref, subject, body)
+                 VALUES (:uid, :ref, :subject, :body)"
+            );
+            $stmt->execute([
+                'uid'     => $uid,
+                'ref'     => $ticketRef,
+                'subject' => $subject,
+                'body'    => $body,
+            ]);
+            echo json_encode(['success' => true, 'message' => 'Ticket created — ' . $ticketRef]);
+            exit;
+        }
 
-    $expectedAggStmt = $db->prepare(
-        "SELECT
-           (SELECT COALESCE(SUM(expected_return),0) FROM plan_investments       WHERE user_id = :uid7 AND status = 'active')
-         + (SELECT COALESCE(SUM(expected_return),0) FROM commodity_investments  WHERE user_id = :uid8 AND status = 'active')
-         + (SELECT COALESCE(SUM(expected_return),0) FROM realestate_investments WHERE user_id = :uid9 AND status = 'active')
-         AS total_expected_all"
-    );
-    $expectedAggStmt->execute(['uid7' => $uid, 'uid8' => $uid, 'uid9' => $uid]);
-    $total_expected_all = (float) $expectedAggStmt->fetchColumn();
+        echo json_encode(['success' => false, 'message' => 'Unknown action']);
+        exit;
+    }
 
-    // Recent transactions (last 5)
-    $txStmt = $db->prepare(
-        "SELECT type, amount, status, created_at
-         FROM transactions WHERE user_id = :uid
-         ORDER BY created_at DESC LIMIT 5"
-    );
-    $txStmt->execute(['uid' => $uid]);
-    $recent_transactions = $txStmt->fetchAll();
+    // ── GET: dashboard overview data ─────────────────────────────────
 
     // User info
-    $userStmt = $db->prepare("SELECT email, full_name, created_at FROM users WHERE id = :uid");
+    $userStmt = $db->prepare(
+        "SELECT id, email, full_name, username, kyc_status, card_tier,
+                two_fa_enabled, is_verified, is_active, current_ip,
+                created_at, last_login_at
+         FROM users WHERE id = :uid"
+    );
     $userStmt->execute(['uid' => $uid]);
-    $userInfo = $userStmt->fetch();
+    $user = $userStmt->fetch(PDO::FETCH_ASSOC);
 
-    // Product rates — wrapped defensively; never let a missing column crash the whole dashboard
-    $rates = [];
-    try {
-        $ratesStmt = $db->query(
-            "SELECT product, label, duration_months, rate
-             FROM rates WHERE is_active = 1
-             ORDER BY product, duration_months"
-        );
-        $rates = $ratesStmt->fetchAll();
-    } catch (PDOException $rateErr) {
-        $rates = [];
+    if (!$user) {
+        http_response_code(404);
+        echo json_encode(['success' => false, 'message' => 'User not found']);
+        exit;
     }
+
+    // Recent transactions (last 10)
+    $txStmt = $db->prepare(
+        "SELECT t.type, t.amount, t.amount_usd, t.currency_symbol, t.status,
+                t.recipient_address, t.tx_hash, t.created_at
+         FROM transactions t
+         WHERE t.user_id = :uid
+         ORDER BY t.created_at DESC LIMIT 10"
+    );
+    $txStmt->execute(['uid' => $uid]);
+    $recentTx = $txStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Notifications (last 20, newest first)
+    $notifStmt = $db->prepare(
+        "SELECT id, type, title, message, action_url, is_read, created_at
+         FROM notifications
+         WHERE user_id = :uid
+         ORDER BY created_at DESC LIMIT 20"
+    );
+    $notifStmt->execute(['uid' => $uid]);
+    $notifications = $notifStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Unread count
+    $unreadStmt = $db->prepare(
+        "SELECT COUNT(*) FROM notifications WHERE user_id = :uid AND is_read = 0"
+    );
+    $unreadStmt->execute(['uid' => $uid]);
+    $unreadCount = (int) $unreadStmt->fetchColumn();
+
+    // Support tickets count
+    $ticketStmt = $db->prepare(
+        "SELECT COUNT(*) FROM support_tickets WHERE user_id = :uid AND status NOT IN ('closed','resolved')"
+    );
+    $ticketStmt->execute(['uid' => $uid]);
+    $openTickets = (int) $ticketStmt->fetchColumn();
 
     echo json_encode([
         'success' => true,
         'data'    => [
-            'user'                => [
-                'email'        => $userInfo['email'],
-                'full_name'    => $userInfo['full_name'],
-                'member_since' => $userInfo['created_at'],
-            ],
-            'currency'            => $currency,
-            'balance'             => number_format($balance,             2, '.', ''),
-            'total_invested_all'  => number_format($total_invested_all, 2, '.', ''),
-            'active_count_all'    => $active_count_all,
-            'total_expected_all'  => number_format($total_expected_all, 2, '.', ''),
-            'recent_transactions' => $recent_transactions,
-            'rates'               => $rates,
+            'user'                => $user,
+            'recent_transactions' => $recentTx,
+            'notifications'       => $notifications,
+            'unread_notifications' => $unreadCount,
+            'open_tickets'        => $openTickets,
         ]
     ]);
+
 } catch (PDOException $e) {
-    error_log('dashboard.php PDOException: ' . $e->getMessage());
+    error_log('dashboard.php: ' . $e->getMessage());
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Server error']);
 }

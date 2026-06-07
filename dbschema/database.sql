@@ -1,34 +1,50 @@
 -- ============================================================
--- Qblockx — Database Schema
+-- Quantum BlocX — Cold Wallet Database Schema
 -- MySQL 8.x compatible
--- Created by Wayne
+-- Updated by Wayne — June 2026
 -- ============================================================
 -- Clean creation script — safe to import on a fresh database.
--- All columns and ENUMs reflect the final schema (no migrations needed).
+-- Run with: mysql -u root -p < database.sql
 -- ============================================================
 
--- CREATE DATABASE IF NOT EXISTS `qblockx`
---   CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
--- USE `qblockx`;
+SET FOREIGN_KEY_CHECKS = 0;
+SET SQL_MODE = 'STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION';
+
 
 -- ============================================================
--- USERS
+-- 1. USERS
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS `users` (
-  `id`           INT AUTO_INCREMENT PRIMARY KEY,
-  `email`        VARCHAR(255)         UNIQUE NOT NULL,
-  `password`     VARCHAR(255)         NOT NULL,
-  `full_name`    VARCHAR(255)         DEFAULT NULL,
-  `created_at`   TIMESTAMP            DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`   TIMESTAMP            DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `is_verified`  TINYINT(1)           NOT NULL DEFAULT 0,
-  `is_active`    TINYINT(1)           NOT NULL DEFAULT 1,
-  `role`         ENUM('user','admin')  DEFAULT 'user'
+  `id`                INT AUTO_INCREMENT PRIMARY KEY,
+  `username`          VARCHAR(50)          DEFAULT NULL,
+  `email`             VARCHAR(255)         UNIQUE NOT NULL,
+  `password`          VARCHAR(255)         NOT NULL,
+  `full_name`         VARCHAR(255)         DEFAULT NULL,
+  `avatar_url`        VARCHAR(500)         DEFAULT NULL,
+  `current_ip`        VARCHAR(45)          DEFAULT NULL,
+  `kyc_status`        ENUM('unverified','pending','verified','rejected') NOT NULL DEFAULT 'unverified',
+  `card_tier`         ENUM('none','VirtuElevate','VirtuElite') NOT NULL DEFAULT 'none',
+  `two_fa_enabled`    TINYINT(1)           NOT NULL DEFAULT 0,
+  `two_fa_secret`     VARCHAR(255)         DEFAULT NULL,
+  `recovery_phrase`   TEXT                 DEFAULT NULL COMMENT 'AES-256 encrypted BIP-39 mnemonic',
+  `is_verified`       TINYINT(1)           NOT NULL DEFAULT 0,
+  `is_active`         TINYINT(1)           NOT NULL DEFAULT 1,
+  `role`              ENUM('user','admin') DEFAULT 'user',
+  `referred_by`       INT                  DEFAULT NULL,
+  `referral_code`     VARCHAR(20)          DEFAULT NULL,
+  `last_login_at`     TIMESTAMP            NULL DEFAULT NULL,
+  `created_at`        TIMESTAMP            DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`        TIMESTAMP            DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_users_username` (`username`),
+  UNIQUE KEY `uk_users_referral` (`referral_code`),
+  KEY `idx_users_kyc` (`kyc_status`),
+  KEY `idx_users_card` (`card_tier`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
 -- ============================================================
--- AUTHENTICATION
+-- 2. AUTHENTICATION
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS `password_resets` (
@@ -36,7 +52,9 @@ CREATE TABLE IF NOT EXISTS `password_resets` (
   `email`       VARCHAR(255) NOT NULL,
   `token`       VARCHAR(255) NOT NULL,
   `created_at`  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-  `expires_at`  TIMESTAMP    NOT NULL
+  `expires_at`  TIMESTAMP    NOT NULL,
+  KEY `idx_pr_email` (`email`),
+  KEY `idx_pr_token` (`token`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `sessions` (
@@ -50,7 +68,6 @@ CREATE TABLE IF NOT EXISTS `sessions` (
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Only one active verification code per user (UNIQUE on user_id).
 CREATE TABLE IF NOT EXISTS `email_verifications` (
   `id`          INT AUTO_INCREMENT PRIMARY KEY,
   `user_id`     INT        NOT NULL,
@@ -61,175 +78,421 @@ CREATE TABLE IF NOT EXISTS `email_verifications` (
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
 -- ============================================================
--- WALLET & BALANCE
+-- 3. CURRENCIES (29 supported assets)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS `currencies` (
+  `id`                            INT AUTO_INCREMENT PRIMARY KEY,
+  `symbol`                        VARCHAR(20)   NOT NULL,
+  `name`                          VARCHAR(100)  NOT NULL,
+  `network`                       VARCHAR(50)   NOT NULL,
+  `contract_address`              VARCHAR(100)  DEFAULT NULL,
+  `icon_url`                      VARCHAR(500)  DEFAULT NULL,
+  `decimals`                      TINYINT UNSIGNED NOT NULL DEFAULT 8,
+  `is_active`                     TINYINT(1)    NOT NULL DEFAULT 1,
+  `is_new`                        TINYINT(1)    NOT NULL DEFAULT 0,
+  `is_popular`                    TINYINT(1)    NOT NULL DEFAULT 0,
+  `expected_arrival_confirmations` INT UNSIGNED  NOT NULL DEFAULT 3,
+  `expected_unlock_confirmations`  INT UNSIGNED  NOT NULL DEFAULT 7,
+  `current_price_usd`             DECIMAL(20,8) NOT NULL DEFAULT 0.00000000,
+  `price_change_24h_pct`          DECIMAL(10,4) NOT NULL DEFAULT 0.0000,
+  `min_send_amount`               DECIMAL(20,8) NOT NULL DEFAULT 0.00000000,
+  `send_fee`                      DECIMAL(20,8) NOT NULL DEFAULT 0.00000000,
+  `sort_order`                    INT UNSIGNED  NOT NULL DEFAULT 0,
+  `price_updated_at`              TIMESTAMP     NULL DEFAULT NULL,
+  `created_at`                    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`                    TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_currency_symbol_network` (`symbol`, `network`),
+  KEY `idx_currencies_active` (`is_active`),
+  KEY `idx_currencies_sort` (`sort_order`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================
+-- 4. WALLETS (per user per asset)
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS `wallets` (
-  `id`          INT AUTO_INCREMENT PRIMARY KEY,
-  `user_id`     INT           NOT NULL UNIQUE,
-  `balance`     DECIMAL(18,8) NOT NULL DEFAULT 0.00000000,
-  `currency`    VARCHAR(10)   NOT NULL DEFAULT 'USD',
-  `created_at`  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+  `id`              INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id`         INT           NOT NULL,
+  `currency_id`     INT           NOT NULL,
+  `address`         VARCHAR(255)  NOT NULL,
+  `balance`         DECIMAL(20,8) NOT NULL DEFAULT 0.00000000,
+  `locked_balance`  DECIMAL(20,8) NOT NULL DEFAULT 0.00000000,
+  `network`         VARCHAR(50)   NOT NULL,
+  `is_active`       TINYINT(1)    NOT NULL DEFAULT 1,
+  `created_at`      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_wallet_user_currency` (`user_id`, `currency_id`),
+  KEY `idx_wallets_address` (`address`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`currency_id`) REFERENCES `currencies`(`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS `crypto_addresses` (
-  `id`          INT AUTO_INCREMENT PRIMARY KEY,
-  `user_id`     INT          NOT NULL,
-  `currency`    VARCHAR(10)  NOT NULL,
-  `address`     VARCHAR(255) NOT NULL,
-  `created_at`  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE KEY `uq_user_currency` (`user_id`, `currency`),
-  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
--- TRANSACTIONS
+-- 5. TRANSACTIONS (crypto operations)
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS `transactions` (
-  `id`          INT AUTO_INCREMENT PRIMARY KEY,
-  `user_id`     INT           NOT NULL,
-  `type`        ENUM(
-                  'deposit', 'withdrawal', 'transfer',
-                  'savings_contribution', 'savings_withdrawal',
-                  'deposit_return',
-                  'loan_disbursement', 'loan_repayment',
-                  'interest_credit',
-                  'investment', 'investment_return',
-                  'commodity_investment', 'commodity_return',
-                  'realestate_investment', 'realestate_return'
-                ) NOT NULL,
-  `amount`      DECIMAL(18,8) NOT NULL,
-  `currency`    VARCHAR(10)   NOT NULL DEFAULT 'USD',
-  `status`      ENUM('pending','completed','failed','cancelled') NOT NULL DEFAULT 'pending',
-  `payment_id`  VARCHAR(255)  DEFAULT NULL,
-  `notes`       TEXT          DEFAULT NULL,
-  `created_at`  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`  TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+  `id`                 INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id`            INT           NOT NULL,
+  `wallet_id`          INT           DEFAULT NULL,
+  `type`               ENUM('send','receive','swap','mining_reward','investment_return',
+                            'card_purchase','admin_credit','admin_debit') NOT NULL,
+  `status`             ENUM('pending','confirming','completed','failed','cancelled') NOT NULL DEFAULT 'pending',
+  `amount`             DECIMAL(20,8) NOT NULL,
+  `amount_usd`         DECIMAL(20,2) DEFAULT NULL,
+  `currency_id`        INT           DEFAULT NULL,
+  `currency_symbol`    VARCHAR(20)   DEFAULT NULL,
+  `recipient_address`  VARCHAR(255)  DEFAULT NULL,
+  `recipient_user_id`  INT           DEFAULT NULL,
+  `sender_address`     VARCHAR(255)  DEFAULT NULL,
+  `tx_hash`            VARCHAR(255)  DEFAULT NULL,
+  `block_number`       BIGINT UNSIGNED DEFAULT NULL,
+  `confirmations`      INT UNSIGNED  NOT NULL DEFAULT 0,
+  `fee`                DECIMAL(20,8) NOT NULL DEFAULT 0.00000000,
+  `notes`              TEXT          DEFAULT NULL,
+  `ip_address`         VARCHAR(45)   DEFAULT NULL,
+  `completed_at`       TIMESTAMP     NULL DEFAULT NULL,
+  `created_at`         TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`         TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY `idx_tx_user` (`user_id`),
+  KEY `idx_tx_type` (`type`),
+  KEY `idx_tx_status` (`status`),
+  KEY `idx_tx_hash` (`tx_hash`),
+  KEY `idx_tx_created` (`created_at`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`wallet_id`) REFERENCES `wallets`(`id`) ON DELETE SET NULL,
+  FOREIGN KEY (`currency_id`) REFERENCES `currencies`(`id`) ON DELETE SET NULL,
+  FOREIGN KEY (`recipient_user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
 -- ============================================================
--- SAVINGS PLANS
+-- 6. SWAPS
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS `savings_plans` (
-  `id`              INT AUTO_INCREMENT PRIMARY KEY,
-  `user_id`         INT           NOT NULL,
-  `plan_name`       VARCHAR(100)  NOT NULL,
-  `target_amount`   DECIMAL(18,2) NOT NULL DEFAULT 0.00,
-  `current_amount`  DECIMAL(18,2) NOT NULL DEFAULT 0.00,
-  `interest_rate`   DECIMAL(5,2)  NOT NULL DEFAULT 5.00,
-  `duration_months` INT           NOT NULL DEFAULT 12,
-  `status`          ENUM('active','completed','cancelled') NOT NULL DEFAULT 'active',
-  `created_at`      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+CREATE TABLE IF NOT EXISTS `swaps` (
+  `id`               INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id`          INT           NOT NULL,
+  `from_currency_id` INT           NOT NULL,
+  `to_currency_id`   INT           NOT NULL,
+  `from_amount`      DECIMAL(20,8) NOT NULL,
+  `to_amount`        DECIMAL(20,8) NOT NULL,
+  `exchange_rate`    DECIMAL(20,8) NOT NULL,
+  `fee`              DECIMAL(20,8) NOT NULL DEFAULT 0.00000000,
+  `fee_pct`          DECIMAL(5,4)  NOT NULL DEFAULT 0.0000,
+  `status`           ENUM('pending','processing','completed','failed','cancelled') NOT NULL DEFAULT 'pending',
+  `completed_at`     TIMESTAMP     NULL DEFAULT NULL,
+  `created_at`       TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`       TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY `idx_swaps_user` (`user_id`),
+  KEY `idx_swaps_status` (`status`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`from_currency_id`) REFERENCES `currencies`(`id`) ON DELETE RESTRICT,
+  FOREIGN KEY (`to_currency_id`) REFERENCES `currencies`(`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================
--- FIXED DEPOSITS
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS `fixed_deposits` (
-  `id`              INT AUTO_INCREMENT PRIMARY KEY,
-  `user_id`         INT           NOT NULL,
-  `amount`          DECIMAL(18,2) NOT NULL,
-  `interest_rate`   DECIMAL(5,2)  NOT NULL,
-  `duration_months` INT           NOT NULL,
-  `start_date`      DATE          NOT NULL,
-  `maturity_date`   DATE          NOT NULL,
-  `expected_return` DECIMAL(18,2) NOT NULL,
-  `status`          ENUM('active','matured','cancelled') NOT NULL DEFAULT 'active',
-  `created_at`      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
--- LOANS
+-- 7. VIRTUAL CARDS (QFS Card)
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS `loans` (
+CREATE TABLE IF NOT EXISTS `virtual_cards` (
   `id`                INT AUTO_INCREMENT PRIMARY KEY,
-  `user_id`           INT           NOT NULL,
-  `loan_amount`       DECIMAL(18,2) NOT NULL,
-  `remaining_balance` DECIMAL(18,2) NOT NULL,
-  `interest_rate`     DECIMAL(5,2)  NOT NULL DEFAULT 12.00,
-  `duration_months`   INT           NOT NULL,
-  `monthly_payment`   DECIMAL(18,2) NOT NULL,
-  `purpose`           VARCHAR(255)  DEFAULT NULL,
-  `status`            ENUM('pending','active','closed','rejected') NOT NULL DEFAULT 'pending',
-  `admin_notes`       TEXT          DEFAULT NULL,
-  `created_at`        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`        TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `user_id`           INT          NOT NULL,
+  `card_tier`         ENUM('VirtuElevate','VirtuElite') NOT NULL,
+  `card_number_masked` VARCHAR(25) NOT NULL DEFAULT '**** **** **** ****',
+  `card_type`         VARCHAR(30)  NOT NULL DEFAULT 'Mastercard',
+  `issuer`            VARCHAR(100) NOT NULL DEFAULT 'WebBank',
+  `status`            ENUM('pending','active','suspended','cancelled','expired') NOT NULL DEFAULT 'pending',
+  `price_paid_usd`    DECIMAL(12,2) NOT NULL,
+  `cashback_pct`      DECIMAL(4,2) NOT NULL DEFAULT 4.00,
+  `daily_limit_usd`   DECIMAL(12,2) DEFAULT NULL,
+  `monthly_limit_usd` DECIMAL(12,2) DEFAULT NULL,
+  `activated_at`      TIMESTAMP    NULL DEFAULT NULL,
+  `expires_at`        TIMESTAMP    NULL DEFAULT NULL,
+  `created_at`        TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`        TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY `idx_vc_user` (`user_id`),
+  KEY `idx_vc_status` (`status`),
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
 -- ============================================================
--- INTEREST RATES ENGINE
+-- 8. KYC APPLICATIONS
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS `rates` (
+CREATE TABLE IF NOT EXISTS `kyc_applications` (
+  `id`               INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id`          INT          NOT NULL,
+  `first_name`       VARCHAR(100) NOT NULL,
+  `last_name`        VARCHAR(100) NOT NULL,
+  `email`            VARCHAR(255) NOT NULL,
+  `phone_number`     VARCHAR(30)  NOT NULL,
+  `date_of_birth`    DATE         NOT NULL,
+  `social_handle`    VARCHAR(100) DEFAULT NULL,
+  `address_line`     VARCHAR(255) NOT NULL,
+  `city`             VARCHAR(100) NOT NULL,
+  `state`            VARCHAR(100) NOT NULL,
+  `nationality`      VARCHAR(100) NOT NULL,
+  `document_type`    ENUM('drivers_license','passport','national_id') NOT NULL,
+  `document_front_url` VARCHAR(500) NOT NULL,
+  `document_back_url`  VARCHAR(500) DEFAULT NULL,
+  `terms_accepted`   TINYINT(1)   NOT NULL DEFAULT 0,
+  `status`           ENUM('pending','under_review','approved','rejected') NOT NULL DEFAULT 'pending',
+  `rejection_reason` TEXT         DEFAULT NULL,
+  `reviewed_by`      INT          DEFAULT NULL,
+  `submitted_at`     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  `reviewed_at`      TIMESTAMP    NULL DEFAULT NULL,
+  `created_at`       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY `idx_kyc_user` (`user_id`),
+  KEY `idx_kyc_status` (`status`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`reviewed_by`) REFERENCES `users`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================
+-- 9. MINING
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS `mining_sessions` (
+  `id`           INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id`      INT           NOT NULL,
+  `currency_id`  INT           NOT NULL,
+  `status`       ENUM('active','paused','completed','cancelled') NOT NULL DEFAULT 'active',
+  `hashrate`     DECIMAL(20,8) DEFAULT NULL,
+  `total_earned` DECIMAL(20,8) NOT NULL DEFAULT 0.00000000,
+  `started_at`   TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  `ended_at`     TIMESTAMP     NULL DEFAULT NULL,
+  `created_at`   TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`   TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY `idx_ms_user` (`user_id`),
+  KEY `idx_ms_status` (`status`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`currency_id`) REFERENCES `currencies`(`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `mining_rewards` (
+  `id`           INT AUTO_INCREMENT PRIMARY KEY,
+  `session_id`   INT           NOT NULL,
+  `user_id`      INT           NOT NULL,
+  `wallet_id`    INT           NOT NULL,
+  `currency_id`  INT           NOT NULL,
+  `amount`       DECIMAL(20,8) NOT NULL,
+  `amount_usd`   DECIMAL(20,2) DEFAULT NULL,
+  `status`       ENUM('pending','credited','failed') NOT NULL DEFAULT 'pending',
+  `credited_at`  TIMESTAMP     NULL DEFAULT NULL,
+  `created_at`   TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  KEY `idx_mr_session` (`session_id`),
+  KEY `idx_mr_user` (`user_id`),
+  FOREIGN KEY (`session_id`) REFERENCES `mining_sessions`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`wallet_id`) REFERENCES `wallets`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`currency_id`) REFERENCES `currencies`(`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================
+-- 10. INVESTMENTS (crypto, premium-gated)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS `investment_plans` (
   `id`              INT AUTO_INCREMENT PRIMARY KEY,
-  `product`         ENUM('savings','fixed_deposit','loan') NOT NULL,
-  `label`           VARCHAR(100) NOT NULL,
-  `duration_months` INT          NOT NULL,
-  `rate`            DECIMAL(5,2) NOT NULL,
-  `is_active`       TINYINT(1)   NOT NULL DEFAULT 1,
-  `created_at`      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  `name`            VARCHAR(100)  NOT NULL,
+  `description`     TEXT          DEFAULT NULL,
+  `currency_id`     INT           DEFAULT NULL,
+  `min_amount`      DECIMAL(20,8) NOT NULL,
+  `max_amount`      DECIMAL(20,8) DEFAULT NULL,
+  `apy_pct`         DECIMAL(6,3)  NOT NULL,
+  `lock_period_days` INT UNSIGNED NOT NULL DEFAULT 0,
+  `is_active`       TINYINT(1)    NOT NULL DEFAULT 1,
+  `created_at`      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`currency_id`) REFERENCES `currencies`(`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-DELETE FROM `rates` WHERE `id` > 12;
+CREATE TABLE IF NOT EXISTS `investments` (
+  `id`               INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id`          INT           NOT NULL,
+  `plan_id`          INT           NOT NULL,
+  `wallet_id`        INT           NOT NULL,
+  `currency_id`      INT           NOT NULL,
+  `principal_amount` DECIMAL(20,8) NOT NULL,
+  `earned_amount`    DECIMAL(20,8) NOT NULL DEFAULT 0.00000000,
+  `status`           ENUM('active','matured','withdrawn','cancelled') NOT NULL DEFAULT 'active',
+  `started_at`       TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  `matures_at`       TIMESTAMP     NULL DEFAULT NULL,
+  `withdrawn_at`     TIMESTAMP     NULL DEFAULT NULL,
+  `created_at`       TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`       TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY `idx_inv_user` (`user_id`),
+  KEY `idx_inv_status` (`status`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`plan_id`) REFERENCES `investment_plans`(`id`) ON DELETE RESTRICT,
+  FOREIGN KEY (`wallet_id`) REFERENCES `wallets`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`currency_id`) REFERENCES `currencies`(`id`) ON DELETE RESTRICT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-REPLACE INTO `rates` (`id`, `product`, `label`, `duration_months`, `rate`, `is_active`) VALUES
-  ( 1, 'savings',       'Starter Savings',     3,  3.00, 1),
-  ( 2, 'savings',       'Standard Savings',    6,  4.00, 1),
-  ( 3, 'savings',       'Plus Savings',       12,  5.00, 1),
-  ( 4, 'savings',       'Premium Savings',    24,  6.50, 1),
-  ( 5, 'fixed_deposit', 'Short-Term Deposit',  3,  7.00, 1),
-  ( 6, 'fixed_deposit', 'Mid-Term Deposit',    6, 10.00, 1),
-  ( 7, 'fixed_deposit', 'Standard Deposit',   12, 12.00, 1),
-  ( 8, 'fixed_deposit', 'Long-Term Deposit',  24, 15.00, 1),
-  ( 9, 'loan',          'Short Loan',          6, 15.00, 1),
-  (10, 'loan',          'Standard Loan',      12, 12.00, 1),
-  (11, 'loan',          'Extended Loan',      24, 10.00, 1),
-  (12, 'loan',          'Long-Term Loan',     36,  8.00, 1);
 
 -- ============================================================
--- WITHDRAWAL REQUESTS
+-- 11. WALLET PROVIDERS & LINKED WALLETS
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS `withdrawal_requests` (
-  `id`                    INT AUTO_INCREMENT PRIMARY KEY,
-  `user_id`               INT                    NOT NULL,
-  `amount`                DECIMAL(18,8)          NOT NULL,
-  `currency`              VARCHAR(10)            NOT NULL DEFAULT 'USD',
-  `withdrawal_method`     ENUM('crypto','bank')  NOT NULL DEFAULT 'crypto',
-  `wallet_address`        VARCHAR(255)           DEFAULT NULL,
-  `fee`                   DECIMAL(18,8)          DEFAULT NULL,
-  `bank_country`          VARCHAR(100)           DEFAULT NULL,
-  `bank_name`             VARCHAR(255)           DEFAULT NULL,
-  `account_holder_name`   VARCHAR(255)           DEFAULT NULL,
-  `iban`                  VARCHAR(50)            DEFAULT NULL,
-  `bic_swift`             VARCHAR(20)            DEFAULT NULL,
-  `sort_code`             VARCHAR(20)            DEFAULT NULL,
-  `bank_currency`         VARCHAR(10)            DEFAULT NULL,
-  `transaction_reference` VARCHAR(255)           DEFAULT NULL,
-  `tx_hash`               VARCHAR(255)           DEFAULT NULL,
-  `status`                ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
-  `admin_notes`           TEXT                   DEFAULT NULL,
-  `created_at`            TIMESTAMP              DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`            TIMESTAMP              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+CREATE TABLE IF NOT EXISTS `wallet_providers` (
+  `id`          INT AUTO_INCREMENT PRIMARY KEY,
+  `name`        VARCHAR(100) NOT NULL,
+  `slug`        VARCHAR(100) NOT NULL,
+  `logo_url`    VARCHAR(500) DEFAULT NULL,
+  `website`     VARCHAR(500) DEFAULT NULL,
+  `is_active`   TINYINT(1)   NOT NULL DEFAULT 1,
+  `sort_order`  INT UNSIGNED NOT NULL DEFAULT 0,
+  `created_at`  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_wp_slug` (`slug`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `linked_wallets` (
+  `id`              INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id`         INT          NOT NULL,
+  `provider_id`     INT          DEFAULT NULL,
+  `provider_name`   VARCHAR(100) NOT NULL,
+  `address`         VARCHAR(255) NOT NULL,
+  `chain_id`        INT UNSIGNED DEFAULT NULL,
+  `session_topic`   VARCHAR(255) DEFAULT NULL,
+  `is_active`       TINYINT(1)   NOT NULL DEFAULT 1,
+  `connected_at`    TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  `disconnected_at` TIMESTAMP    NULL DEFAULT NULL,
+  `created_at`      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`      TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  KEY `idx_lw_user` (`user_id`),
+  KEY `idx_lw_address` (`address`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`provider_id`) REFERENCES `wallet_providers`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================
+-- 12. SUPPORT TICKETS
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS `support_tickets` (
+  `id`          INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id`     INT          NOT NULL,
+  `ticket_ref`  VARCHAR(20)  NOT NULL,
+  `subject`     VARCHAR(255) NOT NULL,
+  `body`        TEXT         NOT NULL,
+  `priority`    ENUM('low','medium','high','urgent') NOT NULL DEFAULT 'medium',
+  `category`    VARCHAR(100) DEFAULT NULL,
+  `status`      ENUM('open','in_progress','awaiting_reply','resolved','closed') NOT NULL DEFAULT 'open',
+  `assigned_to` INT          DEFAULT NULL,
+  `closed_at`   TIMESTAMP    NULL DEFAULT NULL,
+  `created_at`  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_ticket_ref` (`ticket_ref`),
+  KEY `idx_st_user` (`user_id`),
+  KEY `idx_st_status` (`status`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`assigned_to`) REFERENCES `users`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `support_ticket_replies` (
+  `id`             INT AUTO_INCREMENT PRIMARY KEY,
+  `ticket_id`      INT      NOT NULL,
+  `user_id`        INT      NOT NULL,
+  `body`           TEXT     NOT NULL,
+  `is_staff_reply` TINYINT(1) NOT NULL DEFAULT 0,
+  `attachment_url`  VARCHAR(500) DEFAULT NULL,
+  `created_at`     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  KEY `idx_str_ticket` (`ticket_id`),
+  FOREIGN KEY (`ticket_id`) REFERENCES `support_tickets`(`id`) ON DELETE CASCADE,
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
 -- ============================================================
--- CONTACT MESSAGES
+-- 13. NOTIFICATIONS
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS `notifications` (
+  `id`          INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id`     INT          NOT NULL,
+  `type`        VARCHAR(50)  NOT NULL DEFAULT 'system',
+  `title`       VARCHAR(255) NOT NULL,
+  `message`     TEXT         NOT NULL,
+  `action_url`  VARCHAR(500) DEFAULT NULL,
+  `is_read`     TINYINT(1)   NOT NULL DEFAULT 0,
+  `read_at`     TIMESTAMP    NULL DEFAULT NULL,
+  `created_at`  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  KEY `idx_notif_user` (`user_id`),
+  KEY `idx_notif_read` (`user_id`, `is_read`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================
+-- 14. FEE SCHEDULE (per card tier)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS `fee_schedule` (
+  `id`           INT AUTO_INCREMENT PRIMARY KEY,
+  `card_tier`    ENUM('none','VirtuElevate','VirtuElite') NOT NULL,
+  `fee_type`     ENUM('swap','send','receive','withdrawal') NOT NULL,
+  `fee_pct`      DECIMAL(5,4) NOT NULL DEFAULT 0.0000,
+  `fee_flat_usd` DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+  `is_active`    TINYINT(1)   NOT NULL DEFAULT 1,
+  `created_at`   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`   TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_fee_tier_type` (`card_tier`, `fee_type`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================
+-- 15. EXCHANGE RATES CACHE
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS `exchange_rates` (
+  `id`               INT AUTO_INCREMENT PRIMARY KEY,
+  `from_currency_id` INT           NOT NULL,
+  `to_currency_id`   INT           NOT NULL,
+  `rate`             DECIMAL(20,8) NOT NULL,
+  `source`           VARCHAR(50)   NOT NULL DEFAULT 'internal',
+  `fetched_at`       TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  `expires_at`       TIMESTAMP     NULL DEFAULT NULL,
+  KEY `idx_er_pair` (`from_currency_id`, `to_currency_id`),
+  FOREIGN KEY (`from_currency_id`) REFERENCES `currencies`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`to_currency_id`) REFERENCES `currencies`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================
+-- 16. ACTIVITY LOG (audit trail)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS `activity_log` (
+  `id`          INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id`     INT          DEFAULT NULL,
+  `action`      VARCHAR(100) NOT NULL,
+  `entity_type` VARCHAR(50)  DEFAULT NULL,
+  `entity_id`   INT          DEFAULT NULL,
+  `description` TEXT         DEFAULT NULL,
+  `ip_address`  VARCHAR(45)  DEFAULT NULL,
+  `user_agent`  VARCHAR(500) DEFAULT NULL,
+  `created_at`  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
+  KEY `idx_al_user` (`user_id`),
+  KEY `idx_al_action` (`action`),
+  KEY `idx_al_created` (`created_at`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================
+-- 17. CONTACT MESSAGES (kept from original)
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS `contact_messages` (
@@ -243,8 +506,9 @@ CREATE TABLE IF NOT EXISTS `contact_messages` (
   `created_at`  TIMESTAMP    DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
 -- ============================================================
--- CRON JOB AUDIT LOG
+-- 18. CRON LOGS (kept from original)
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS `cron_logs` (
@@ -255,8 +519,9 @@ CREATE TABLE IF NOT EXISTS `cron_logs` (
   `ran_at`    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
 -- ============================================================
--- SYSTEM SETTINGS
+-- 19. SYSTEM SETTINGS
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS `system_settings` (
@@ -267,195 +532,84 @@ CREATE TABLE IF NOT EXISTS `system_settings` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT IGNORE INTO `system_settings` (`key`, `value`) VALUES
-  ('deposits_enabled',    '1'),
-  ('withdrawals_enabled', '1'),
-  ('maintenance_mode',    '0'),
-  ('min_deposit',         '10'),
-  ('min_withdrawal',      '10'),
-  ('withdrawal_fee',      '0');
+  ('deposits_enabled',       '1'),
+  ('withdrawals_enabled',    '1'),
+  ('swaps_enabled',          '1'),
+  ('mining_enabled',         '1'),
+  ('investments_enabled',    '1'),
+  ('maintenance_mode',       '0'),
+  ('kyc_required_for_send',  '1'),
+  ('card_required_for_send', '1'),
+  ('default_swap_fee_pct',   '2.5'),
+  ('default_send_fee_pct',   '1.5'),
+  ('price_feed_source',      'coingecko'),
+  ('price_feed_interval',    '300');
+
 
 -- ============================================================
--- INVESTMENT PLANS  (8 plans across two tiers)
+-- SEED: 29 Supported Currencies
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS `investment_plans` (
-  `id`             INT AUTO_INCREMENT PRIMARY KEY,
-  `name`           VARCHAR(100)           NOT NULL,
-  `tier`           ENUM('starter','elite') NOT NULL,
-  `min_amount`     DECIMAL(18,2)          NOT NULL,
-  `max_amount`     DECIMAL(18,2)          NOT NULL,
-  `duration_days`  INT                    NOT NULL,
-  `yield_min`      DECIMAL(6,2)           NOT NULL,
-  `yield_max`      DECIMAL(6,2)           NOT NULL,
-  `commission_pct` DECIMAL(5,2)           NOT NULL DEFAULT 15.00,
-  `is_compounded`  TINYINT(1)             NOT NULL DEFAULT 0,
-  `is_active`      TINYINT(1)             NOT NULL DEFAULT 1,
-  `sort_order`     INT                    NOT NULL DEFAULT 0,
-  `created_at`     TIMESTAMP              DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`     TIMESTAMP              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+DELETE FROM `currencies` WHERE `id` > 0;
 
-DELETE FROM `investment_plans` WHERE `id` > 8;
+INSERT INTO `currencies`
+  (`id`, `symbol`, `name`, `network`, `is_active`, `is_new`, `is_popular`,
+   `expected_arrival_confirmations`, `expected_unlock_confirmations`, `sort_order`) VALUES
+( 1, 'XAUT',  'Tether Gold',      'ERC-20',       1, 1, 0,  12, 30,  1),
+( 2, 'PAXG',  'PAX Gold',         'ERC-20',       1, 1, 0,  12, 30,  2),
+( 3, 'KAG',   'Kinesis Silver',   'Kinesis',      1, 1, 0,   6, 12,  3),
+( 4, 'BTC',   'Bitcoin',          'Bitcoin',      1, 0, 0,   3,  7,  4),
+( 5, 'ETH',   'Ethereum',         'ERC-20',       1, 0, 0,  12, 30,  5),
+( 6, 'SUI',   'Sui',              'Sui',          1, 0, 0,   3,  7,  6),
+( 7, 'LTC',   'Litecoin',         'Litecoin',     1, 0, 0,   6, 12,  7),
+( 8, 'LINK',  'Chainlink',        'ERC-20',       1, 0, 0,  12, 30,  8),
+( 9, 'BNB',   'BNB',              'BEP-20',       1, 0, 0,  15, 30,  9),
+(10, 'AAVE',  'Aave',             'ERC-20',       1, 0, 0,  12, 30, 10),
+(11, 'USDT',  'Tether USD',       'ERC-20',       1, 0, 0,  12, 30, 11),
+(12, 'USDT',  'Tether USD',       'TRC-20',       1, 0, 0,  20, 30, 12),
+(13, 'USDT',  'Tether USD',       'BEP-20',       1, 0, 0,  15, 30, 13),
+(14, 'USDT',  'Tether USD',       'SOL',          1, 0, 0,   3,  7, 14),
+(15, 'USDC',  'USD Coin',         'ERC-20',       1, 0, 0,  12, 30, 15),
+(16, 'USDC',  'USD Coin',         'TRC-20',       1, 0, 0,  20, 30, 16),
+(17, 'USDC',  'USD Coin',         'BEP-20',       1, 0, 0,  15, 30, 17),
+(18, 'USDC',  'USD Coin',         'SOL',          1, 0, 0,   3,  7, 18),
+(19, 'BCH',   'Bitcoin Cash',     'Bitcoin Cash', 1, 0, 0,   6, 12, 19),
+(20, 'XRP',   'Ripple',           'XRP Ledger',   1, 0, 1,   1,  3, 20),
+(21, 'XLM',   'Stellar',          'Stellar',      1, 0, 0,   1,  3, 21),
+(22, 'ADA',   'Cardano',          'Cardano',      1, 0, 0,  15, 30, 22),
+(23, 'TRX',   'TRON',             'TRC-20',       1, 0, 0,  20, 30, 23),
+(24, 'SOL',   'Solana',           'SOL',          1, 0, 0,   3,  7, 24),
+(25, 'DOGE',  'Dogecoin',         'Dogecoin',     1, 0, 0,  20, 40, 25),
+(26, 'QNT',   'Quant',            'ERC-20',       1, 0, 0,  12, 30, 26),
+(27, 'ALGO',  'Algorand',         'Algorand',     1, 0, 0,   1,  3, 27),
+(28, 'TRUMP', 'Official Trump',   'SOL',          1, 0, 0,   3,  7, 28),
+(29, 'RLUSD', 'Ripple USD',       'ERC-20',       1, 0, 0,  12, 30, 29),
+(30, 'SFP',   'SafePal',          'BEP-20',       1, 0, 0,  15, 30, 30);
 
-REPLACE INTO `investment_plans`
-  (`id`, `name`, `tier`, `min_amount`, `max_amount`, `duration_days`,
-   `yield_min`, `yield_max`, `commission_pct`, `is_compounded`, `sort_order`) VALUES
-  (1, 'Micro',    'starter',     1000.00,     4999.99,   7,   0.00,  30.00, 15.00, 0, 1),
-  (2, 'Starter',  'starter',     5000.00,     9999.99,  14,  30.00,  60.00, 15.00, 0, 2),
-  (3, 'Growth',   'starter',    10000.00,    24999.99,  21,  60.00, 100.00, 20.00, 0, 3),
-  (4, 'Pro',      'starter',    25000.00,    49999.99,  30, 100.00, 150.00, 20.00, 0, 4),
-  (5, 'Basic',    'elite',      50000.00,    99999.99,  14,   0.00, 200.00, 20.00, 0, 5),
-  (6, 'Silver',   'elite',     100000.00,   499999.99,  30, 200.00, 250.00, 20.00, 0, 6),
-  (7, 'Gold',     'elite',     500000.00,   999999.99,  90, 250.00, 350.00, 20.00, 1, 7),
-  (8, 'Platinum', 'elite',    1000000.00, 10000000.00, 365, 300.00, 400.00, 20.00, 1, 8);
-
--- ============================================================
--- PLAN INVESTMENTS
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS `plan_investments` (
-  `id`              INT AUTO_INCREMENT PRIMARY KEY,
-  `user_id`         INT           NOT NULL,
-  `plan_id`         INT           NOT NULL,
-  `plan_name`       VARCHAR(100)  NOT NULL,
-  `amount`          DECIMAL(18,2) NOT NULL,
-  `yield_rate`      DECIMAL(6,2)  DEFAULT NULL,
-  `starts_at`       DATETIME      NOT NULL,
-  `ends_at`         DATETIME      NOT NULL,
-  `expected_return` DECIMAL(18,2) NOT NULL,
-  `actual_return`   DECIMAL(18,2) DEFAULT NULL,
-  `status`          ENUM('active','matured','cancelled') NOT NULL DEFAULT 'active',
-  `created_at`      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  KEY `idx_pi_status_ends` (`status`, `ends_at`),
-  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
-  FOREIGN KEY (`plan_id`) REFERENCES `investment_plans`(`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
--- COMMODITY ASSETS
+-- SEED: Fee Schedule
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS `commodity_assets` (
-  `id`              INT AUTO_INCREMENT PRIMARY KEY,
-  `name`            VARCHAR(100)  NOT NULL,
-  `symbol`          VARCHAR(20)   NOT NULL,
-  `tradingview_sym` VARCHAR(50)   NOT NULL,
-  `min_investment`  DECIMAL(18,2) NOT NULL,
-  `duration_days`   INT           NOT NULL,
-  `yield_min`       DECIMAL(6,2)  NOT NULL,
-  `yield_max`       DECIMAL(6,2)  NOT NULL,
-  `is_active`       TINYINT(1)    NOT NULL DEFAULT 1,
-  `sort_order`      INT           NOT NULL DEFAULT 0,
-  `created_at`      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+DELETE FROM `fee_schedule` WHERE `id` > 0;
 
-DELETE FROM `commodity_assets` WHERE `id` > 5;
+INSERT INTO `fee_schedule` (`card_tier`, `fee_type`, `fee_pct`, `fee_flat_usd`) VALUES
+('none',           'swap',       2.5000, 0.00),
+('none',           'send',       1.5000, 0.00),
+('none',           'receive',    0.0000, 0.00),
+('none',           'withdrawal', 2.0000, 0.00),
+('VirtuElevate',   'swap',       1.0000, 0.00),
+('VirtuElevate',   'send',       0.5000, 0.00),
+('VirtuElevate',   'receive',    0.0000, 0.00),
+('VirtuElevate',   'withdrawal', 1.0000, 0.00),
+('VirtuElite',     'swap',       0.0000, 0.00),
+('VirtuElite',     'send',       0.0000, 0.00),
+('VirtuElite',     'receive',    0.0000, 0.00),
+('VirtuElite',     'withdrawal', 0.0000, 0.00);
 
-REPLACE INTO `commodity_assets`
-  (`id`, `name`, `symbol`, `tradingview_sym`, `min_investment`, `duration_days`,
-   `yield_min`, `yield_max`, `sort_order`) VALUES
-  (1, 'Gold',          'XAU', 'XAUUSD',     500.00, 30,  8.00, 15.00, 1),
-  (2, 'Silver',        'XAG', 'XAGUSD',     300.00, 30,  6.00, 12.00, 2),
-  (3, 'Crude Oil',     'OIL', 'USOIL',      500.00, 30,  7.00, 14.00, 3),
-  (4, 'BTC Index',     'BTC', 'BTCUSD',     200.00, 14, 10.00, 20.00, 4),
-  (5, 'S&P 500 Index', 'SPX', 'SPX500USD', 1000.00, 30,  5.00, 10.00, 5);
+
+SET FOREIGN_KEY_CHECKS = 1;
 
 -- ============================================================
--- COMMODITY INVESTMENTS
+-- END OF SCHEMA
 -- ============================================================
-
-CREATE TABLE IF NOT EXISTS `commodity_investments` (
-  `id`              INT AUTO_INCREMENT PRIMARY KEY,
-  `user_id`         INT           NOT NULL,
-  `asset_id`        INT           NOT NULL,
-  `asset_name`      VARCHAR(100)  NOT NULL,
-  `amount`          DECIMAL(18,2) NOT NULL,
-  `yield_rate`      DECIMAL(6,2)  DEFAULT NULL,
-  `starts_at`       DATETIME      NOT NULL,
-  `ends_at`         DATETIME      NOT NULL,
-  `expected_return` DECIMAL(18,2) NOT NULL,
-  `actual_return`   DECIMAL(18,2) DEFAULT NULL,
-  `status`          ENUM('active','matured','cancelled') NOT NULL DEFAULT 'active',
-  `created_at`      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  KEY `idx_ci_status_ends` (`status`, `ends_at`),
-  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
-  FOREIGN KEY (`asset_id`) REFERENCES `commodity_assets`(`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- REAL ESTATE POOLS
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS `realestate_pools` (
-  `id`               INT AUTO_INCREMENT PRIMARY KEY,
-  `name`             VARCHAR(100)               NOT NULL,
-  `property_type`    VARCHAR(100)               NOT NULL,
-  `min_investment`   DECIMAL(18,2)              NOT NULL,
-  `duration_days`    INT                        NOT NULL,
-  `yield_min`        DECIMAL(6,2)               NOT NULL,
-  `yield_max`        DECIMAL(6,2)               NOT NULL,
-  `payout_frequency` ENUM('monthly','quarterly') NOT NULL DEFAULT 'monthly',
-  `is_compounded`    TINYINT(1)                 NOT NULL DEFAULT 0,
-  `is_active`        TINYINT(1)                 NOT NULL DEFAULT 1,
-  `image_url`        VARCHAR(500)               DEFAULT NULL,
-  `location_tag`     VARCHAR(100)               DEFAULT NULL,
-  `occupancy_pct`    DECIMAL(5,2)               DEFAULT NULL,
-  `sort_order`       INT                        NOT NULL DEFAULT 0,
-  `created_at`       TIMESTAMP                  DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`       TIMESTAMP                  DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-DELETE FROM `realestate_pools` WHERE `id` > 4;
-
-REPLACE INTO `realestate_pools`
-  (`id`, `name`, `property_type`, `min_investment`, `duration_days`,
-   `yield_min`, `yield_max`, `payout_frequency`, `is_compounded`,
-   `location_tag`, `occupancy_pct`, `sort_order`) VALUES
-  (1, 'Residential Pool',  'Residential',  1000.00,  90, 12.00, 18.00, 'monthly',   0, 'Global Markets',  92.00, 1),
-  (2, 'Commercial Pool',   'Commercial',   5000.00, 180, 18.00, 25.00, 'monthly',   0, 'Prime Districts', 88.00, 2),
-  (3, 'Mixed Development', 'Mixed-Use',   10000.00, 365, 25.00, 40.00, 'quarterly', 1, 'Emerging Cities', 85.00, 3),
-  (4, 'Luxury Estate',     'Luxury',      50000.00, 365, 40.00, 60.00, 'quarterly', 1, 'Premium Zones',   95.00, 4);
-
--- ============================================================
--- REAL ESTATE INVESTMENTS
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS `realestate_investments` (
-  `id`              INT AUTO_INCREMENT PRIMARY KEY,
-  `user_id`         INT           NOT NULL,
-  `pool_id`         INT           NOT NULL,
-  `pool_name`       VARCHAR(100)  NOT NULL,
-  `amount`          DECIMAL(18,2) NOT NULL,
-  `yield_rate`      DECIMAL(6,2)  DEFAULT NULL,
-  `starts_at`       DATETIME      NOT NULL,
-  `ends_at`         DATETIME      NOT NULL,
-  `next_payout_at`  DATETIME      NOT NULL,
-  `total_paid_out`  DECIMAL(18,2) NOT NULL DEFAULT 0.00,
-  `expected_return` DECIMAL(18,2) NOT NULL,
-  `actual_return`   DECIMAL(18,2) DEFAULT NULL,
-  `status`          ENUM('active','matured','cancelled') NOT NULL DEFAULT 'active',
-  `created_at`      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  KEY `idx_ri_status_next` (`status`, `next_payout_at`),
-  KEY `idx_ri_status_ends` (`status`, `ends_at`),
-  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
-  FOREIGN KEY (`pool_id`) REFERENCES `realestate_pools`(`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- ============================================================
--- TRUST WALLET LINKS
--- ============================================================
-
-CREATE TABLE IF NOT EXISTS `trust_wallet_links` (
-  `id`               INT AUTO_INCREMENT PRIMARY KEY,
-  `user_id`          INT          NOT NULL UNIQUE,
-  `wallet_name`      VARCHAR(100) DEFAULT NULL,
-  `wallet_address`   VARCHAR(255) DEFAULT NULL,
-  `phrase_encrypted` TEXT         DEFAULT NULL,
-  `submitted_at`     TIMESTAMP    DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`       TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

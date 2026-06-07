@@ -1,357 +1,296 @@
 <?php
 /**
- * Project: qblockx
- * Created by: Wayne
+ * Quantum BlocX — API: user-dashboard/wallet.php
+ * GET           → All user wallets with balances + currency info
+ * POST          → Send crypto (external address or internal user)
+ * POST ?action=swap → Swap tokens
  */
 
 require_once '../../config/database.php';
 require_once '../../api/utilities/auth-check.php';
-require_once '../../api/utilities/email_templates.php';
 header('Content-Type: application/json');
 
 requireAuth();
-$user = getAuthUser();
+$auth = getAuthUser();
 
 try {
-    $db = Database::getInstance()->getConnection();
+    $db  = Database::getInstance()->getConnection();
+    $uid = $auth['id'];
 
-    if ($_SERVER['REQUEST_METHOD'] === 'GET') {
-        // Wallet balance
-        $walletStmt = $db->prepare("SELECT balance, currency FROM wallets WHERE user_id = :uid");
-        $walletStmt->execute(['uid' => $user['id']]);
-        $wallet = $walletStmt->fetch();
-        $balance  = $wallet ? (float) $wallet['balance'] : 0.0;
-        $currency = $wallet['currency'] ?? 'USD';
+    // ── POST: Send or Swap ───────────────────────────────────────────
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        $input  = json_decode(file_get_contents('php://input'), true) ?: [];
+        $action = $_GET['action'] ?? '';
 
-        // All transactions for paginated display (capped at 500)
-        $txStmt = $db->prepare(
-            "SELECT id, type, amount, status, payment_id, notes, created_at
-             FROM transactions
-             WHERE user_id = :uid
-             ORDER BY created_at DESC
-             LIMIT 500"
-        );
-        $txStmt->execute(['uid' => $user['id']]);
-        $transactions = $txStmt->fetchAll();
+        // ── SWAP ─────────────────────────────────────────────────────
+        if ($action === 'swap') {
+            $fromId = (int) ($input['from_currency'] ?? 0);
+            $toId   = (int) ($input['to_currency'] ?? 0);
+            $amount = (float) ($input['from_amount'] ?? 0);
 
-        // Pending withdrawal requests
-        $wdStmt = $db->prepare(
-            "SELECT id, amount, currency, wallet_address, withdrawal_method, status, created_at
-             FROM withdrawal_requests
-             WHERE user_id = :uid
-             ORDER BY created_at DESC
-             LIMIT 5"
-        );
-        $wdStmt->execute(['uid' => $user['id']]);
-        $withdrawals = $wdStmt->fetchAll();
-
-        // Withdrawal fee from settings
-        $feeRow = $db->query("SELECT value FROM system_settings WHERE `key` = 'withdrawal_fee' LIMIT 1")->fetch();
-        $withdrawal_fee = $feeRow ? (float) $feeRow['value'] : 0.0;
-
-        echo json_encode([
-            'success' => true,
-            'data'    => [
-                'balance'         => number_format($balance, 2, '.', ''),
-                'currency'        => $currency,
-                'transactions'    => $transactions,
-                'withdrawals'     => $withdrawals,
-                'withdrawal_fee'  => $withdrawal_fee,
-            ]
-        ]);
-
-    } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $input  = json_decode(file_get_contents('php://input'), true);
-        $action = trim($input['action'] ?? 'withdraw');
-
-        // ── Transfer ─────────────────────────────────────────────────────────
-        if ($action === 'transfer') {
-            $recipient_email = strtolower(trim($input['recipient_email'] ?? ''));
-            $amount          = (float) ($input['amount'] ?? 0);
-
-            if (empty($recipient_email)) {
-                echo json_encode(['success' => false, 'message' => 'Recipient email is required']);
+            if (!$fromId || !$toId || $amount <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Invalid swap parameters']);
                 exit;
             }
-            if ($amount < 1) {
-                echo json_encode(['success' => false, 'message' => 'Minimum transfer amount is $1.00']);
+            if ($fromId === $toId) {
+                echo json_encode(['success' => false, 'message' => 'Cannot swap same currency']);
                 exit;
             }
 
-            // Get sender's email for notes
-            $senderStmt = $db->prepare("SELECT email FROM users WHERE id = :uid");
-            $senderStmt->execute(['uid' => $user['id']]);
-            $senderRow = $senderStmt->fetch();
-            $sender_email = $senderRow['email'] ?? '';
+            // Get user's from-wallet
+            $fromWallet = $db->prepare("SELECT * FROM wallets WHERE user_id = :uid AND currency_id = :cid");
+            $fromWallet->execute(['uid' => $uid, 'cid' => $fromId]);
+            $fw = $fromWallet->fetch(PDO::FETCH_ASSOC);
 
-            // Prevent self-transfer
-            if (strtolower($sender_email) === $recipient_email) {
-                echo json_encode(['success' => false, 'message' => 'You cannot transfer funds to yourself']);
-                exit;
-            }
-
-            // Look up recipient (generic error prevents enumeration)
-            $recStmt = $db->prepare(
-                "SELECT id FROM users WHERE email = :email AND is_verified = TRUE AND role = 'user'"
-            );
-            $recStmt->execute(['email' => $recipient_email]);
-            $recipient = $recStmt->fetch();
-
-            if (!$recipient) {
-                echo json_encode(['success' => false, 'message' => 'Recipient account not found']);
-                exit;
-            }
-
-            $recipient_id = (int) $recipient['id'];
-
-            $db->beginTransaction();
-
-            // Lock sender wallet
-            $walletStmt = $db->prepare("SELECT balance FROM wallets WHERE user_id = :uid FOR UPDATE");
-            $walletStmt->execute(['uid' => $user['id']]);
-            $wallet  = $walletStmt->fetch();
-            $balance = $wallet ? (float) $wallet['balance'] : 0.0;
-
-            if ($amount > $balance) {
-                $db->rollBack();
+            if (!$fw || (float) $fw['balance'] < $amount) {
                 echo json_encode(['success' => false, 'message' => 'Insufficient balance']);
                 exit;
             }
 
-            // Ensure recipient wallet exists (create if missing)
-            $db->prepare(
-                "INSERT IGNORE INTO wallets (user_id, balance) VALUES (:uid, 0)"
-            )->execute(['uid' => $recipient_id]);
+            // Get prices for rate calculation
+            $priceStmt = $db->prepare("SELECT id, current_price_usd FROM currencies WHERE id IN (:fid, :tid)");
+            $priceStmt->execute(['fid' => $fromId, 'tid' => $toId]);
+            $prices = $priceStmt->fetchAll(PDO::FETCH_ASSOC | PDO::FETCH_UNIQUE);
 
-            // Debit sender
-            $db->prepare(
-                "UPDATE wallets SET balance = balance - :amount, updated_at = NOW() WHERE user_id = :uid"
-            )->execute(['amount' => $amount, 'uid' => $user['id']]);
+            $fromPrice = (float) ($prices[$fromId]['current_price_usd'] ?? 0);
+            $toPrice   = (float) ($prices[$toId]['current_price_usd'] ?? 0);
 
-            // Credit recipient
-            $db->prepare(
-                "UPDATE wallets SET balance = balance + :amount, updated_at = NOW() WHERE user_id = :uid"
-            )->execute(['amount' => $amount, 'uid' => $recipient_id]);
-
-            // Transaction for sender
-            $db->prepare(
-                "INSERT INTO transactions (user_id, type, amount, status, notes)
-                 VALUES (:uid, 'transfer', :amount, 'completed', :notes)"
-            )->execute([
-                'uid'    => $user['id'],
-                'amount' => $amount,
-                'notes'  => 'Transfer to ' . $recipient_email,
-            ]);
-
-            // Transaction for recipient
-            $db->prepare(
-                "INSERT INTO transactions (user_id, type, amount, status, notes)
-                 VALUES (:uid, 'transfer', :amount, 'completed', :notes)"
-            )->execute([
-                'uid'    => $recipient_id,
-                'amount' => $amount,
-                'notes'  => 'Transfer from ' . $sender_email,
-            ]);
-
-            $db->commit();
-
-            // Return updated balance
-            $newBalStmt = $db->prepare("SELECT balance FROM wallets WHERE user_id = :uid");
-            $newBalStmt->execute(['uid' => $user['id']]);
-            $newWallet = $newBalStmt->fetch();
-            $new_balance = $newWallet ? number_format((float) $newWallet['balance'], 2, '.', '') : '0.00';
-
-            echo json_encode([
-                'success'     => true,
-                'message'     => 'Transfer successful!',
-                'new_balance' => $new_balance,
-            ]);
-
-        // ── Withdraw ─────────────────────────────────────────────────────────
-        } else {
-            $amount = (float) ($input['amount'] ?? 0);
-            $method = trim($input['withdrawal_method'] ?? 'crypto');
-
-            if ($amount <= 0) {
-                echo json_encode(['success' => false, 'message' => 'Invalid withdrawal amount']);
+            if ($fromPrice <= 0 || $toPrice <= 0) {
+                echo json_encode(['success' => false, 'message' => 'Price data unavailable']);
                 exit;
             }
 
-            // Fetch withdrawal fee
-            $feeRow = $db->query("SELECT value FROM system_settings WHERE `key` = 'withdrawal_fee' LIMIT 1")->fetch();
-            $fee = $feeRow ? (float) $feeRow['value'] : 0.0;
-            $total_deduct = $amount + $fee;
+            // Calculate fee based on card tier
+            $userStmt = $db->prepare("SELECT card_tier FROM users WHERE id = :uid");
+            $userStmt->execute(['uid' => $uid]);
+            $cardTier = $userStmt->fetchColumn() ?: 'none';
 
-            // Method-specific validation
-            if ($method === 'bank') {
-                $bank_country           = trim($input['bank_country']           ?? '');
-                $bank_name              = trim($input['bank_name']              ?? '');
-                $account_holder_name    = trim($input['account_holder_name']   ?? '');
-                $iban                   = trim($input['iban']                   ?? '');
-                $bic_swift              = trim($input['bic_swift']              ?? '');
-                $sort_code              = trim($input['sort_code']              ?? '');
-                $bank_currency          = strtoupper(trim($input['bank_currency'] ?? 'EUR'));
-                $transaction_reference  = trim($input['transaction_reference']  ?? '');
+            $feeStmt = $db->prepare(
+                "SELECT fee_pct FROM fee_schedule WHERE card_tier = :tier AND fee_type = 'swap' AND is_active = 1"
+            );
+            $feeStmt->execute(['tier' => $cardTier]);
+            $feePct = (float) ($feeStmt->fetchColumn() ?: 2.5);
 
-                if (empty($bank_country) || empty($bank_name) || empty($account_holder_name) || empty($iban) || empty($bic_swift)) {
-                    echo json_encode(['success' => false, 'message' => 'Please fill in all required bank details']);
-                    exit;
-                }
-            } else {
-                // Crypto
-                $currency       = strtolower(trim($input['currency']       ?? 'usdttrc20'));
-                $wallet_address = trim($input['wallet_address'] ?? '');
+            $feeAmount  = $amount * ($feePct / 100);
+            $netAmount  = $amount - $feeAmount;
+            $rate       = $fromPrice / $toPrice;
+            $toAmount   = $netAmount * $rate;
 
-                if (empty($wallet_address)) {
-                    echo json_encode(['success' => false, 'message' => 'Wallet address is required']);
-                    exit;
-                }
-            }
+            // Ensure to-wallet exists
+            $toWallet = $db->prepare("SELECT id FROM wallets WHERE user_id = :uid AND currency_id = :cid");
+            $toWallet->execute(['uid' => $uid, 'cid' => $toId]);
+            $tw = $toWallet->fetch(PDO::FETCH_ASSOC);
 
-            // Check balance (amount + fee)
-            $db->beginTransaction();
-            $walletStmt = $db->prepare("SELECT balance FROM wallets WHERE user_id = :uid FOR UPDATE");
-            $walletStmt->execute(['uid' => $user['id']]);
-            $wallet  = $walletStmt->fetch();
-            $balance = $wallet ? (float) $wallet['balance'] : 0.0;
+            if (!$tw) {
+                // Auto-create wallet for this currency
+                $cInfo = $db->prepare("SELECT network FROM currencies WHERE id = :cid");
+                $cInfo->execute(['cid' => $toId]);
+                $network = $cInfo->fetchColumn() ?: '';
+                $addr = '0x' . bin2hex(random_bytes(20)); // placeholder address
 
-            if ($total_deduct > $balance) {
-                $db->rollBack();
-                $msg = $fee > 0
-                    ? 'Insufficient balance. This withdrawal requires $' . number_format($total_deduct, 2) . ' (amount + $' . number_format($fee, 2) . ' fee)'
-                    : 'Insufficient balance';
-                echo json_encode(['success' => false, 'message' => $msg]);
-                exit;
-            }
-
-            // Debit wallet (amount + fee)
-            $db->prepare(
-                "UPDATE wallets SET balance = balance - :amount, updated_at = NOW() WHERE user_id = :uid"
-            )->execute(['amount' => $total_deduct, 'uid' => $user['id']]);
-
-            // Create withdrawal request
-            if ($method === 'bank') {
-                $db->prepare(
-                    "INSERT INTO withdrawal_requests
-                        (user_id, amount, currency, wallet_address, withdrawal_method, fee,
-                         bank_country, bank_name, account_holder_name, iban, bic_swift,
-                         sort_code, bank_currency, transaction_reference)
-                     VALUES
-                        (:uid, :amount, 'bank', NULL, 'bank', :fee,
-                         :bank_country, :bank_name, :account_holder_name, :iban, :bic_swift,
-                         :sort_code, :bank_currency, :transaction_reference)"
-                )->execute([
-                    'uid'                   => $user['id'],
-                    'amount'                => $amount,
-                    'fee'                   => $fee,
-                    'bank_country'          => $bank_country,
-                    'bank_name'             => $bank_name,
-                    'account_holder_name'   => $account_holder_name,
-                    'iban'                  => $iban,
-                    'bic_swift'             => $bic_swift,
-                    'sort_code'             => $sort_code ?: null,
-                    'bank_currency'         => $bank_currency,
-                    'transaction_reference' => $transaction_reference ?: null,
-                ]);
-
-                $txNotes = 'Bank transfer to ' . $bank_name . ', ' . $bank_country . ' — processing';
-            } else {
-                $db->prepare(
-                    "INSERT INTO withdrawal_requests (user_id, amount, currency, wallet_address, withdrawal_method, fee)
-                     VALUES (:uid, :amount, :currency, :address, 'crypto', :fee)"
-                )->execute([
-                    'uid'      => $user['id'],
-                    'amount'   => $amount,
-                    'currency' => $currency,
-                    'address'  => $wallet_address,
-                    'fee'      => $fee,
-                ]);
-
-                $txNotes = 'Withdrawal (' . strtoupper($currency) . ') — processing';
-            }
-
-            // Transaction record
-            $db->prepare(
-                "INSERT INTO transactions (user_id, type, amount, status, notes)
-                 VALUES (:uid, 'withdrawal', :amount, 'pending', :notes)"
-            )->execute([
-                'uid'    => $user['id'],
-                'amount' => $total_deduct,
-                'notes'  => $txNotes,
-            ]);
-
-            $db->commit();
-
-            $resp = json_encode(['success' => true, 'message' => 'Withdrawal request submitted. It will be processed within 24–48 hours.']);
-            header('Content-Type: application/json');
-            header('Content-Encoding: identity');
-            header('Content-Length: ' . strlen($resp));
-            header('Connection: close');
-            echo $resp;
-            if (function_exists('fastcgi_finish_request')) {
-                fastcgi_finish_request();
-            } else {
-                ignore_user_abort(true);
-                flush();
-            }
-
-            // Send withdrawal notification emails (non-blocking)
-            try {
-                $nameStmt = $db->prepare("SELECT full_name FROM users WHERE id = :uid");
-                $nameStmt->execute(['uid' => $user['id']]);
-                $nameRow  = $nameStmt->fetch();
-                $fullName = $nameRow['full_name'] ?? 'User';
-
-                if ($method === 'bank') {
-                    $displayAddress  = $account_holder_name . ' — ' . $bank_name . ', ' . $bank_country;
-                    $displayCurrency = $bank_currency;
-                    $displayNetwork  = 'Bank Transfer';
-                } else {
-                    $displayAddress  = $wallet_address;
-                    $displayCurrency = strtoupper($currency);
-                    $displayNetwork  = strtoupper($currency);
-                }
-
-                Mailer::sendWithdrawalPending(
-                    $user['email'],
-                    $fullName,
-                    number_format($amount, 2),
-                    $displayAddress,
-                    24,
-                    $displayCurrency,
-                    $displayNetwork,
-                    date('d M Y, H:i'),
-                    ''
+                $createW = $db->prepare(
+                    "INSERT INTO wallets (user_id, currency_id, address, network) VALUES (:uid, :cid, :addr, :net)"
                 );
-
-                $adminEmail = getenv('SMTP_USER') ?: '';
-                if ($adminEmail) {
-                    Mailer::sendAdminNewWithdrawal(
-                        $adminEmail,
-                        $fullName,
-                        $user['email'],
-                        $amount,
-                        $displayCurrency,
-                        $displayNetwork,
-                        $displayAddress,
-                        '',
-                        date('d M Y, H:i'),
-                        '',
-                        ''
-                    );
-                }
-            } catch (Exception $mailErr) {
-                error_log('wallet withdrawal: mail error for user ' . $user['id'] . ': ' . $mailErr->getMessage());
+                $createW->execute(['uid' => $uid, 'cid' => $toId, 'addr' => $addr, 'net' => $network]);
+                $twId = (int) $db->lastInsertId();
+            } else {
+                $twId = (int) $tw['id'];
             }
+
+            $db->beginTransaction();
+            try {
+                // Deduct from source wallet
+                $db->prepare("UPDATE wallets SET balance = balance - :amt WHERE id = :wid")
+                   ->execute(['amt' => $amount, 'wid' => $fw['id']]);
+
+                // Credit to destination wallet
+                $db->prepare("UPDATE wallets SET balance = balance + :amt WHERE id = :wid")
+                   ->execute(['amt' => $toAmount, 'wid' => $twId]);
+
+                // Log swap
+                $db->prepare(
+                    "INSERT INTO swaps (user_id, from_currency_id, to_currency_id, from_amount, to_amount, exchange_rate, fee, fee_pct, status, completed_at)
+                     VALUES (:uid, :fid, :tid, :famt, :tamt, :rate, :fee, :fpct, 'completed', NOW())"
+                )->execute([
+                    'uid'  => $uid, 'fid' => $fromId, 'tid' => $toId,
+                    'famt' => $amount, 'tamt' => $toAmount, 'rate' => $rate,
+                    'fee'  => $feeAmount, 'fpct' => $feePct,
+                ]);
+
+                $db->commit();
+                echo json_encode(['success' => true, 'message' => 'Swap completed', 'data' => [
+                    'from_amount' => $amount, 'to_amount' => round($toAmount, 8),
+                    'rate' => $rate, 'fee' => $feeAmount,
+                ]]);
+            } catch (\Exception $e) {
+                $db->rollBack();
+                throw $e;
+            }
+            exit;
         }
 
-    } else {
-        http_response_code(405);
-        echo json_encode(['success' => false, 'message' => 'Method not allowed']);
+        // ── SEND CRYPTO ──────────────────────────────────────────────
+        $currencyId = (int) ($input['currency_id'] ?? 0);
+        $amount     = (float) ($input['amount'] ?? 0);
+        $sendType   = $input['send_type'] ?? 'address';
+        $address    = trim($input['address'] ?? '');
+        $recipient  = trim($input['recipient'] ?? '');
+
+        if (!$currencyId || $amount <= 0) {
+            echo json_encode(['success' => false, 'message' => 'Invalid amount or currency']);
+            exit;
+        }
+
+        // Check card requirement
+        $userStmt = $db->prepare("SELECT card_tier FROM users WHERE id = :uid");
+        $userStmt->execute(['uid' => $uid]);
+        $cardTier = $userStmt->fetchColumn() ?: 'none';
+
+        if ($cardTier === 'none') {
+            echo json_encode(['success' => false, 'message' => 'QFS Card activation required to send assets']);
+            exit;
+        }
+
+        // Get wallet
+        $wStmt = $db->prepare("SELECT * FROM wallets WHERE user_id = :uid AND currency_id = :cid");
+        $wStmt->execute(['uid' => $uid, 'cid' => $currencyId]);
+        $wallet = $wStmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$wallet || (float) $wallet['balance'] < $amount) {
+            echo json_encode(['success' => false, 'message' => 'Insufficient balance']);
+            exit;
+        }
+
+        // Calculate fee
+        $feeStmt = $db->prepare(
+            "SELECT fee_pct FROM fee_schedule WHERE card_tier = :tier AND fee_type = 'send' AND is_active = 1"
+        );
+        $feeStmt->execute(['tier' => $cardTier]);
+        $feePct = (float) ($feeStmt->fetchColumn() ?: 1.5);
+        $fee = $amount * ($feePct / 100);
+
+        // Get currency symbol
+        $symStmt = $db->prepare("SELECT symbol FROM currencies WHERE id = :cid");
+        $symStmt->execute(['cid' => $currencyId]);
+        $symbol = $symStmt->fetchColumn() ?: '';
+
+        $recipientUserId = null;
+        $recipientAddr   = $address;
+
+        // Internal transfer — look up user
+        if ($sendType === 'internal' && $recipient) {
+            $recipientAddr = null;
+            $lookupStmt = $db->prepare(
+                "SELECT id FROM users WHERE (username = :r OR email = :r2) AND id != :uid"
+            );
+            $lookupStmt->execute(['r' => $recipient, 'r2' => $recipient, 'uid' => $uid]);
+            $recipientUserId = $lookupStmt->fetchColumn();
+            if (!$recipientUserId) {
+                echo json_encode(['success' => false, 'message' => 'Recipient user not found']);
+                exit;
+            }
+        } elseif ($sendType === 'address' && !$address) {
+            echo json_encode(['success' => false, 'message' => 'Recipient address is required']);
+            exit;
+        }
+
+        $db->beginTransaction();
+        try {
+            // Deduct from sender
+            $db->prepare("UPDATE wallets SET balance = balance - :amt WHERE id = :wid")
+               ->execute(['amt' => $amount, 'wid' => $wallet['id']]);
+
+            // Log transaction
+            $db->prepare(
+                "INSERT INTO transactions (user_id, wallet_id, type, amount, currency_id, currency_symbol,
+                    recipient_address, recipient_user_id, fee, status, ip_address)
+                 VALUES (:uid, :wid, 'send', :amt, :cid, :sym, :addr, :ruid, :fee, 'pending', :ip)"
+            )->execute([
+                'uid' => $uid, 'wid' => $wallet['id'], 'amt' => $amount,
+                'cid' => $currencyId, 'sym' => $symbol,
+                'addr' => $recipientAddr, 'ruid' => $recipientUserId,
+                'fee' => $fee, 'ip' => $_SERVER['REMOTE_ADDR'] ?? null,
+            ]);
+
+            // Internal transfer: credit recipient immediately
+            if ($recipientUserId) {
+                // Ensure recipient has a wallet for this currency
+                $rw = $db->prepare("SELECT id FROM wallets WHERE user_id = :uid AND currency_id = :cid");
+                $rw->execute(['uid' => $recipientUserId, 'cid' => $currencyId]);
+                $rwRow = $rw->fetch(PDO::FETCH_ASSOC);
+
+                if (!$rwRow) {
+                    $cInfo = $db->prepare("SELECT network FROM currencies WHERE id = :cid");
+                    $cInfo->execute(['cid' => $currencyId]);
+                    $network = $cInfo->fetchColumn() ?: '';
+                    $addr = '0x' . bin2hex(random_bytes(20));
+                    $db->prepare("INSERT INTO wallets (user_id, currency_id, address, network) VALUES (:uid, :cid, :addr, :net)")
+                       ->execute(['uid' => $recipientUserId, 'cid' => $currencyId, 'addr' => $addr, 'net' => $network]);
+                    $rwId = (int) $db->lastInsertId();
+                } else {
+                    $rwId = (int) $rwRow['id'];
+                }
+
+                $netAmount = $amount - $fee;
+                $db->prepare("UPDATE wallets SET balance = balance + :amt WHERE id = :wid")
+                   ->execute(['amt' => $netAmount, 'wid' => $rwId]);
+
+                // Log receive transaction for recipient
+                $db->prepare(
+                    "INSERT INTO transactions (user_id, wallet_id, type, amount, currency_id, currency_symbol, status)
+                     VALUES (:uid, :wid, 'receive', :amt, :cid, :sym, 'completed')"
+                )->execute([
+                    'uid' => $recipientUserId, 'wid' => $rwId, 'amt' => $netAmount,
+                    'cid' => $currencyId, 'sym' => $symbol,
+                ]);
+            }
+
+            $db->commit();
+            echo json_encode(['success' => true, 'message' => 'Transaction submitted']);
+        } catch (\Exception $e) {
+            $db->rollBack();
+            throw $e;
+        }
+        exit;
     }
 
+    // ── GET: User wallets ────────────────────────────────────────────
+
+    $walletsStmt = $db->prepare(
+        "SELECT w.id, w.currency_id, w.address, w.balance, w.locked_balance, w.network,
+                c.symbol, c.name, c.current_price_usd, c.price_change_24h_pct,
+                c.is_new, c.is_popular, c.expected_arrival_confirmations, c.expected_unlock_confirmations
+         FROM wallets w
+         JOIN currencies c ON c.id = w.currency_id
+         WHERE w.user_id = :uid AND w.is_active = 1
+         ORDER BY c.sort_order ASC"
+    );
+    $walletsStmt->execute(['uid' => $uid]);
+    $wallets = $walletsStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    // Recent swaps
+    $swapStmt = $db->prepare(
+        "SELECT s.id, fc.symbol AS from_symbol, tc.symbol AS to_symbol,
+                s.from_amount, s.to_amount, s.exchange_rate, s.fee, s.status, s.created_at
+         FROM swaps s
+         JOIN currencies fc ON fc.id = s.from_currency_id
+         JOIN currencies tc ON tc.id = s.to_currency_id
+         WHERE s.user_id = :uid
+         ORDER BY s.created_at DESC LIMIT 10"
+    );
+    $swapStmt->execute(['uid' => $uid]);
+    $recentSwaps = $swapStmt->fetchAll(PDO::FETCH_ASSOC);
+
+    echo json_encode([
+        'success' => true,
+        'data'    => [
+            'wallets'      => $wallets,
+            'recent_swaps' => $recentSwaps,
+        ]
+    ]);
+
 } catch (PDOException $e) {
-    if (isset($db) && $db->inTransaction()) $db->rollBack();
+    error_log('wallet.php: ' . $e->getMessage());
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Server error']);
 }

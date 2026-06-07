@@ -1,7 +1,7 @@
 <?php
 /**
  * Project: qblockx
- * Include: mobile-dock.php — bottom mobile navigation dock (user dashboard)
+ * Include: mobile-dock.php — bottom mobile navigation dock (Quantum BlocX cold wallet layout)
  * Visible only on ≤ 899px via responsive.css
  */
 $currentSection = $currentSection ?? 'overview';
@@ -10,33 +10,27 @@ $currentSection = $currentSection ?? 'overview';
 <nav class="mobile-dock" aria-label="Mobile navigation" role="navigation">
 
   <a href="#" class="dock-item <?= $currentSection === 'overview' ? 'active' : '' ?>"
-     data-nav="overview" aria-label="Dashboard">
+     data-nav="overview" aria-label="Overview">
     <i class="ph ph-squares-four" aria-hidden="true"></i>
-    <span>Dashboard</span>
+    <span>Overview</span>
   </a>
 
-  <a href="#" class="dock-item <?= $currentSection === 'wallet' ? 'active' : '' ?>"
-     data-nav="wallet" aria-label="Wallet">
-    <i class="ph ph-wallet" aria-hidden="true"></i>
-    <span>Wallet</span>
+  <a href="#" class="dock-item <?= $currentSection === 'send' ? 'active' : '' ?>"
+     data-nav="send" aria-label="Send">
+    <i class="ph ph-arrow-up-right" aria-hidden="true"></i>
+    <span>Send</span>
   </a>
 
-  <a href="#" class="dock-item <?= $currentSection === 'investments' ? 'active' : '' ?>"
-     data-nav="investments" aria-label="Investments">
-    <i class="ph ph-chart-line-up" aria-hidden="true"></i>
-    <span>Invest</span>
+  <a href="#" class="dock-item <?= $currentSection === 'receive' ? 'active' : '' ?>"
+     data-nav="receive" aria-label="Receive">
+    <i class="ph ph-arrow-down-left" aria-hidden="true"></i>
+    <span>Receive</span>
   </a>
 
-  <a href="#" class="dock-item <?= $currentSection === 'commodities' ? 'active' : '' ?>"
-     data-nav="commodities" aria-label="Markets">
-    <i class="ph ph-coin" aria-hidden="true"></i>
-    <span>Markets</span>
-  </a>
-
-  <a href="#" class="dock-item <?= $currentSection === 'realestate' ? 'active' : '' ?>"
-     data-nav="realestate" aria-label="Real Estate">
-    <i class="ph ph-buildings" aria-hidden="true"></i>
-    <span>Property</span>
+  <a href="#" class="dock-item <?= $currentSection === 'swap' ? 'active' : '' ?>"
+     data-nav="swap" aria-label="Swap">
+    <i class="ph ph-swap" aria-hidden="true"></i>
+    <span>Swap</span>
   </a>
 
   <a href="#" class="dock-item <?= $currentSection === 'profile' ? 'active' : '' ?>"
