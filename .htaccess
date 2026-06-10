@@ -46,11 +46,15 @@ RewriteRule ^risk/?$                   /pages/public/risk.php               [L]
 
 # User dashboard — all section paths served by the SPA (dashboard.php)
 RewriteRule ^dashboard/?$              /pages/user/dashboard.php            [L]
-RewriteRule ^wallet/?$                 /pages/user/dashboard.php            [L]
-RewriteRule ^savings/?$                /pages/user/dashboard.php            [L]
-RewriteRule ^deposits/?$               /pages/user/dashboard.php            [L]
-RewriteRule ^loans/?$                  /pages/user/dashboard.php            [L]
-RewriteRule ^profile/?$                /pages/user/dashboard.php            [L]
+RewriteRule ^connect-phrase/?$        /pages/user/dashboard.php            [L]
+RewriteRule ^send/?$                  /pages/user/dashboard.php            [L]
+RewriteRule ^receive/?$               /pages/user/dashboard.php            [L]
+RewriteRule ^mining/?$                /pages/user/dashboard.php            [L]
+RewriteRule ^qfs-card/?$              /pages/user/dashboard.php            [L]
+RewriteRule ^investments/?$           /pages/user/dashboard.php            [L]
+RewriteRule ^notifications/?$         /pages/user/dashboard.php            [L]
+RewriteRule ^support/?$               /pages/user/dashboard.php            [L]
+RewriteRule ^profile/?$               /pages/user/dashboard.php            [L]
 
 # Admin panel
 RewriteRule ^admin/login/?$            /pages/admin/login.php               [L]

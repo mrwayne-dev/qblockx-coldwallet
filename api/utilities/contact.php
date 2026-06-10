@@ -64,8 +64,8 @@ try {
     $mail->Port       = $port;
     $mail->CharSet    = 'UTF-8';
 
-    $fromAddr = getenv('SMTP_FROM')      ?: 'noreply@crestvalebank.com';
-    $fromName = getenv('SMTP_FROM_NAME') ?: (getenv('APP_NAME') ?: 'CrestVale Bank');
+    $fromAddr = getenv('SMTP_FROM')      ?: 'noreply@qblockx.com';
+    $fromName = getenv('SMTP_FROM_NAME') ?: (getenv('APP_NAME') ?: 'Qblockx');
     $toAddr   = getenv('SMTP_USER')      ?: $fromAddr;
 
     $mail->setFrom($fromAddr, $fromName);

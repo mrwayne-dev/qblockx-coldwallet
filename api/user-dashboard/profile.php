@@ -10,6 +10,7 @@
 
 require_once '../../config/database.php';
 require_once '../../api/utilities/auth-check.php';
+require_once '../../api/utilities/email_templates.php';
 header('Content-Type: application/json');
 
 requireAuth();
@@ -94,6 +95,22 @@ try {
 
             // Update user kyc_status
             $db->prepare("UPDATE users SET kyc_status = 'pending' WHERE id = :uid")->execute(['uid' => $uid]);
+
+            // Notify the user that their application was received and is under review
+            $acct = $db->prepare("SELECT email, full_name FROM users WHERE id = :uid");
+            $acct->execute(['uid' => $uid]);
+            $acctRow = $acct->fetch(PDO::FETCH_ASSOC) ?: [];
+            $notifyEmail = $acctRow['email'] ?: $email;
+            $notifyName  = trim($acctRow['full_name'] ?: ($firstName . ' ' . $lastName)) ?: 'there';
+            $body = "We've received your identity verification (KYC) application and it is now under review.\n\n"
+                  . "Our compliance team will review your details and documents shortly. You'll receive another "
+                  . "email once your verification has been approved or if we need any additional information.\n\n"
+                  . "No further action is required from you at this time.";
+            try {
+                Mailer::sendAdminMessage($notifyEmail, $notifyName, 'KYC application submitted — Quantum BlocX', $body);
+            } catch (\Throwable $e) {
+                error_log('KYC submit email failed: ' . $e->getMessage());
+            }
 
             echo json_encode(['success' => true, 'message' => 'KYC application submitted successfully']);
             exit;

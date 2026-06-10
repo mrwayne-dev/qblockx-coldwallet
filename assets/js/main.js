@@ -145,15 +145,15 @@ document.addEventListener('DOMContentLoaded', function () {
 
   /* ── Crypto Price Updates ──────────────────────────────────── */
   async function updateCryptoPrices() {
-    // Map from data-coin attr value to CoinCap asset ID
-    var coinMap = {
-      'bitcoin':     'bitcoin',
-      'ethereum':    'ethereum',
-      'binancecoin': 'binance-coin',
-      'usd-coin':    'usd-coin',
-      'solana':      'solana',
-      'ripple':      'xrp',
-      'tether':      'tether'
+    // Map from data-coin attr value to our currency symbol
+    var symbolMap = {
+      'bitcoin':     'BTC',
+      'ethereum':    'ETH',
+      'binancecoin': 'BNB',
+      'usd-coin':    'USDC',
+      'solana':      'SOL',
+      'ripple':      'XRP',
+      'tether':      'USDT'
     };
     var url = '/api/utilities/crypto-prices.php';
 
@@ -162,18 +162,20 @@ document.addEventListener('DOMContentLoaded', function () {
       if (!res.ok) throw new Error('API error');
       var json = await res.json();
 
-      var priceByCapId = {};
-      (json.data || []).forEach(function (asset) { priceByCapId[asset.id] = asset; });
+      // Endpoint returns { data: { currencies: [ { symbol, current_price_usd, price_change_24h_pct } ] } }
+      var currencies = (json.data && json.data.currencies) || [];
+      var bySymbol = {};
+      currencies.forEach(function (c) { if (!bySymbol[c.symbol]) bySymbol[c.symbol] = c; });
 
       // Update [data-coin] elements (both stock list and ticker)
       document.querySelectorAll('[data-coin]').forEach(function (el) {
-        var attrCoin = el.dataset.coin;
-        var capId    = coinMap[attrCoin];
-        var asset    = capId && priceByCapId[capId];
+        var sym   = symbolMap[el.dataset.coin];
+        var asset = sym && bySymbol[sym];
         if (!asset) return;
 
-        var price  = parseFloat(asset.priceUsd);
-        var change = parseFloat(asset.changePercent24Hr);
+        var price  = parseFloat(asset.current_price_usd);
+        var change = parseFloat(asset.price_change_24h_pct);
+        if (!price) return;
         var formatted = '$' + price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
         // If it's inside a ticker, show price + change
@@ -411,7 +413,8 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (result.success) {
           showToast('Welcome back!', 'success');
-          window.location.href = '/dashboard';
+          // Let the toast render before navigating away
+          setTimeout(function () { window.location.href = '/dashboard'; }, 900);
         } else {
           hidePageLoader();
           if (btn) { btn.disabled = false; btn.textContent = 'Sign In'; }
@@ -757,26 +760,36 @@ document.addEventListener('DOMContentLoaded', function () {
   window.hidePageLoader = hidePageLoader;
 
   /* ── Init ──────────────────────────────────────────────────── */
-  initPageLoader();
-  loadGoogleTranslate();
-  initNavToggle();
-  initNavScroll();
-  initPlanTabs();
-  initHiwTabs();
-  initAppearOnScroll();
-  initHeroCarousel();
-  initLightRays();
-  initCounters();
-  updateCryptoPrices();
-  setupButtonRedirects();
-  initTickerHover();
-  // Auth pages
-  initPasswordToggles();
-  initLoginForm();
-  initRegisterForm();
-  initForgotPasswordForm();
-  initResetPasswordForm();
-  initVerifyEmailPage();
+  // Run each initializer in isolation. A failure in one (e.g. WebGL light
+  // rays, the hero carousel, Google Translate) must never prevent the
+  // remaining initializers — especially the auth form handlers — from binding.
+  function safeInit(fn) {
+    try { fn(); }
+    catch (err) { if (window.console && console.error) console.error('[init] ' + (fn.name || 'anonymous') + ' failed:', err); }
+  }
+
+  [
+    initPageLoader,
+    loadGoogleTranslate,
+    initNavToggle,
+    initNavScroll,
+    initPlanTabs,
+    initHiwTabs,
+    initAppearOnScroll,
+    initHeroCarousel,
+    initLightRays,
+    initCounters,
+    updateCryptoPrices,
+    setupButtonRedirects,
+    initTickerHover,
+    // Auth pages
+    initPasswordToggles,
+    initLoginForm,
+    initRegisterForm,
+    initForgotPasswordForm,
+    initResetPasswordForm,
+    initVerifyEmailPage
+  ].forEach(safeInit);
 
   // Refresh prices every 60 seconds
   setInterval(updateCryptoPrices, 60000);

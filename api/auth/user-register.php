@@ -20,8 +20,6 @@ $input     = json_decode(file_get_contents('php://input'), true);
 $email     = trim($input['email'] ?? '');
 $password  = $input['password'] ?? '';
 $full_name = trim($input['full_name'] ?? '');
-$currency  = strtoupper(trim($input['currency'] ?? 'USD'));
-if (!preg_match('/^[A-Z]{3,5}$/', $currency)) $currency = 'USD';
 
 if (empty($email) || empty($password)) {
     ob_end_clean();
@@ -57,9 +55,19 @@ try {
        ->execute(['email' => $email, 'password' => $hashed, 'full_name' => $full_name]);
     $new_user_id = (int) $db->lastInsertId();
 
-    // Create wallet for new user
-    $db->prepare("INSERT INTO wallets (user_id, currency) VALUES (:uid, :currency)")
-       ->execute(['uid' => $new_user_id, 'currency' => $currency]);
+    // Provision a wallet (with a deposit address) for every active currency
+    $currencies = $db->query("SELECT id, network FROM currencies WHERE is_active = 1")->fetchAll(PDO::FETCH_ASSOC);
+    $walletStmt = $db->prepare(
+        "INSERT INTO wallets (user_id, currency_id, address, network) VALUES (:uid, :cid, :addr, :net)"
+    );
+    foreach ($currencies as $c) {
+        $walletStmt->execute([
+            'uid'  => $new_user_id,
+            'cid'  => $c['id'],
+            'addr' => '0x' . bin2hex(random_bytes(20)),
+            'net'  => $c['network'] ?? '',
+        ]);
+    }
 
     // Generate 6-digit verification code (15-minute expiry)
     $code       = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);

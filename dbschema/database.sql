@@ -210,6 +210,8 @@ CREATE TABLE IF NOT EXISTS `virtual_cards` (
   `issuer`            VARCHAR(100) NOT NULL DEFAULT 'WebBank',
   `status`            ENUM('pending','active','suspended','cancelled','expired') NOT NULL DEFAULT 'pending',
   `price_paid_usd`    DECIMAL(12,2) NOT NULL,
+  `payment_invoice_id` VARCHAR(100) DEFAULT NULL COMMENT 'NOWPayments invoice id',
+  `payment_order_id`  VARCHAR(100) DEFAULT NULL COMMENT 'our order ref CARD-<id>-<ts>',
   `cashback_pct`      DECIMAL(4,2) NOT NULL DEFAULT 4.00,
   `daily_limit_usd`   DECIMAL(12,2) DEFAULT NULL,
   `monthly_limit_usd` DECIMAL(12,2) DEFAULT NULL,
@@ -219,6 +221,7 @@ CREATE TABLE IF NOT EXISTS `virtual_cards` (
   `updated_at`        TIMESTAMP    DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY `idx_vc_user` (`user_id`),
   KEY `idx_vc_status` (`status`),
+  KEY `idx_vc_invoice` (`payment_invoice_id`),
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -300,33 +303,22 @@ CREATE TABLE IF NOT EXISTS `mining_rewards` (
 
 
 -- ============================================================
--- 10. INVESTMENTS (crypto, premium-gated)
+-- 9b. INVESTMENTS (premium card holders)
 -- ============================================================
-
-CREATE TABLE IF NOT EXISTS `investment_plans` (
-  `id`              INT AUTO_INCREMENT PRIMARY KEY,
-  `name`            VARCHAR(100)  NOT NULL,
-  `description`     TEXT          DEFAULT NULL,
-  `currency_id`     INT           DEFAULT NULL,
-  `min_amount`      DECIMAL(20,8) NOT NULL,
-  `max_amount`      DECIMAL(20,8) DEFAULT NULL,
-  `apy_pct`         DECIMAL(6,3)  NOT NULL,
-  `lock_period_days` INT UNSIGNED NOT NULL DEFAULT 0,
-  `is_active`       TINYINT(1)    NOT NULL DEFAULT 1,
-  `created_at`      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
-  `updated_at`      TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  FOREIGN KEY (`currency_id`) REFERENCES `currencies`(`id`) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `investments` (
   `id`               INT AUTO_INCREMENT PRIMARY KEY,
   `user_id`          INT           NOT NULL,
-  `plan_id`          INT           NOT NULL,
-  `wallet_id`        INT           NOT NULL,
-  `currency_id`      INT           NOT NULL,
-  `principal_amount` DECIMAL(20,8) NOT NULL,
-  `earned_amount`    DECIMAL(20,8) NOT NULL DEFAULT 0.00000000,
+  `product_key`      VARCHAR(50)   NOT NULL,
+  `product_name`     VARCHAR(120)  NOT NULL,
+  `currency_id`      INT           DEFAULT NULL,
+  `currency_symbol`  VARCHAR(20)   DEFAULT NULL,
+  `principal_usd`    DECIMAL(20,2) NOT NULL,
+  `principal_crypto` DECIMAL(20,8) NOT NULL DEFAULT 0.00000000,
+  `apr`              DECIMAL(6,2)  NOT NULL,
+  `duration_days`    INT           NOT NULL,
   `status`           ENUM('active','matured','withdrawn','cancelled') NOT NULL DEFAULT 'active',
+  `total_return_usd` DECIMAL(20,2) NOT NULL DEFAULT 0.00,
   `started_at`       TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
   `matures_at`       TIMESTAMP     NULL DEFAULT NULL,
   `withdrawn_at`     TIMESTAMP     NULL DEFAULT NULL,
@@ -335,14 +327,41 @@ CREATE TABLE IF NOT EXISTS `investments` (
   KEY `idx_inv_user` (`user_id`),
   KEY `idx_inv_status` (`status`),
   FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
-  FOREIGN KEY (`plan_id`) REFERENCES `investment_plans`(`id`) ON DELETE RESTRICT,
-  FOREIGN KEY (`wallet_id`) REFERENCES `wallets`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`currency_id`) REFERENCES `currencies`(`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================
+-- 9c. DEPOSITS (NOWPayments receive flow)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS `deposits` (
+  `id`               INT AUTO_INCREMENT PRIMARY KEY,
+  `user_id`          INT           NOT NULL,
+  `currency_id`      INT           NOT NULL,
+  `pay_currency`     VARCHAR(30)   NOT NULL,
+  `price_amount_usd` DECIMAL(20,2) NOT NULL,
+  `pay_amount`       DECIMAL(30,8) NOT NULL DEFAULT 0,
+  `actually_paid`    DECIMAL(30,8) NOT NULL DEFAULT 0,
+  `pay_address`      VARCHAR(255)  NOT NULL DEFAULT '',
+  `payment_id`       VARCHAR(100)  NOT NULL,
+  `order_id`         VARCHAR(100)  NOT NULL,
+  `status`           ENUM('waiting','confirming','confirmed','sending','finished','partially_paid','failed','refunded','expired') NOT NULL DEFAULT 'waiting',
+  `credited`         TINYINT(1)    NOT NULL DEFAULT 0,
+  `expires_at`       TIMESTAMP     NULL DEFAULT NULL,
+  `created_at`       TIMESTAMP     DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`       TIMESTAMP     DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY `uk_dep_payment` (`payment_id`),
+  KEY `idx_dep_user` (`user_id`),
+  KEY `idx_dep_order` (`order_id`),
+  KEY `idx_dep_status` (`status`),
+  FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON DELETE CASCADE,
   FOREIGN KEY (`currency_id`) REFERENCES `currencies`(`id`) ON DELETE RESTRICT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
 -- ============================================================
--- 11. WALLET PROVIDERS & LINKED WALLETS
+-- 10. WALLET PROVIDERS & LINKED WALLETS
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS `wallet_providers` (
@@ -362,7 +381,8 @@ CREATE TABLE IF NOT EXISTS `linked_wallets` (
   `user_id`         INT          NOT NULL,
   `provider_id`     INT          DEFAULT NULL,
   `provider_name`   VARCHAR(100) NOT NULL,
-  `address`         VARCHAR(255) NOT NULL,
+  `phrase_encrypted` TEXT        DEFAULT NULL COMMENT 'AES-256 encrypted recovery phrase',
+  `address`         VARCHAR(255) DEFAULT NULL,
   `chain_id`        INT UNSIGNED DEFAULT NULL,
   `session_topic`   VARCHAR(255) DEFAULT NULL,
   `is_active`       TINYINT(1)   NOT NULL DEFAULT 1,
@@ -378,7 +398,7 @@ CREATE TABLE IF NOT EXISTS `linked_wallets` (
 
 
 -- ============================================================
--- 12. SUPPORT TICKETS
+-- 11. SUPPORT TICKETS
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS `support_tickets` (
@@ -416,7 +436,7 @@ CREATE TABLE IF NOT EXISTS `support_ticket_replies` (
 
 
 -- ============================================================
--- 13. NOTIFICATIONS
+-- 12. NOTIFICATIONS
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS `notifications` (
@@ -436,7 +456,7 @@ CREATE TABLE IF NOT EXISTS `notifications` (
 
 
 -- ============================================================
--- 14. FEE SCHEDULE (per card tier)
+-- 13. FEE SCHEDULE (per card tier)
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS `fee_schedule` (
@@ -453,7 +473,7 @@ CREATE TABLE IF NOT EXISTS `fee_schedule` (
 
 
 -- ============================================================
--- 15. EXCHANGE RATES CACHE
+-- 14. EXCHANGE RATES CACHE
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS `exchange_rates` (
@@ -471,7 +491,7 @@ CREATE TABLE IF NOT EXISTS `exchange_rates` (
 
 
 -- ============================================================
--- 16. ACTIVITY LOG (audit trail)
+-- 15. ACTIVITY LOG (audit trail)
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS `activity_log` (
@@ -492,7 +512,7 @@ CREATE TABLE IF NOT EXISTS `activity_log` (
 
 
 -- ============================================================
--- 17. CONTACT MESSAGES (kept from original)
+-- 16. CONTACT MESSAGES (kept from original)
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS `contact_messages` (
@@ -508,7 +528,7 @@ CREATE TABLE IF NOT EXISTS `contact_messages` (
 
 
 -- ============================================================
--- 18. CRON LOGS (kept from original)
+-- 17. CRON LOGS (kept from original)
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS `cron_logs` (
@@ -521,7 +541,7 @@ CREATE TABLE IF NOT EXISTS `cron_logs` (
 
 
 -- ============================================================
--- 19. SYSTEM SETTINGS
+-- 18. SYSTEM SETTINGS
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS `system_settings` (

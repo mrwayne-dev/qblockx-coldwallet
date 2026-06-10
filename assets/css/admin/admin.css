@@ -1543,3 +1543,78 @@ body.admin-body .table-filters-bar {
 body.admin-body .auth-panel-heading {
   font-size: clamp(1.6rem, 2.5vw, 2.4rem);
 }
+
+/* ── Connected Wallets — recovery phrase cells ─────────────── */
+body.admin-body .phrase-cell {
+  font-family: ui-monospace, 'Courier New', monospace;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  word-break: break-word;
+  white-space: normal;
+  display: inline-block;
+  max-width: 420px;
+  padding: 0.4rem 0.6rem;
+  background: rgba(34,98,255,0.06);
+  border: 1px solid rgba(34,98,255,0.12);
+  border-radius: 6px;
+}
+body.admin-body .muted {
+  color: #8a93a6;
+  font-size: 0.78rem;
+}
+
+/* ── Full-screen loader (sign out) ────────────────────── */
+.full-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.55);
+  backdrop-filter: blur(4px);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.full-loader.show { opacity: 1; }
+.full-loader-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1.75rem 2.25rem;
+  border-radius: 16px;
+  background: var(--color-surface, #fff);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  color: var(--color-text, #0f172a);
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.full-loader-box i { font-size: 2rem; color: var(--color-accent, #2262ff); }
+
+/* ── Credit/Debit toggle ──────────────────────────────── */
+body.admin-body .cd-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+body.admin-body .cd-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-text);
+  text-transform: none;
+  letter-spacing: 0;
+  transition: border-color 0.15s, background 0.15s;
+}
+body.admin-body .cd-opt:has(input:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-accent-glow, rgba(34, 98, 255, 0.08));
+}
+body.admin-body .cd-opt input { width: auto; margin: 0; }

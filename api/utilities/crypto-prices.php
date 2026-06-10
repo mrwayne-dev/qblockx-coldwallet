@@ -87,15 +87,26 @@ function refreshPricesFromCoinGecko(PDO $db): void {
     $url = 'https://api.coingecko.com/api/v3/simple/price?ids=' . $geckoIds
          . '&vs_currencies=usd&include_24hr_change=true';
 
-    $ctx = stream_context_create([
-        'http' => [
-            'timeout' => 10,
-            'header'  => "Accept: application/json\r\n",
-        ]
+    // CoinGecko rejects requests without a User-Agent, so use cURL (more reliable
+    // than file_get_contents and consistent with the payment endpoints).
+    $isDev = (getenv('APP_ENV') === 'development');
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT        => 12,
+        CURLOPT_USERAGENT      => 'Qblockx/1.0 (+https://qblockx.com)',
+        CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+        CURLOPT_SSL_VERIFYPEER => !$isDev,
+        CURLOPT_SSL_VERIFYHOST => $isDev ? 0 : 2,
     ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
 
-    $response = @file_get_contents($url, false, $ctx);
-    if (!$response) return;
+    if (!$response || $httpCode !== 200) {
+        error_log('crypto-prices: CoinGecko fetch failed (HTTP ' . $httpCode . ')');
+        return;
+    }
 
     $data = json_decode($response, true);
     if (!$data) return;

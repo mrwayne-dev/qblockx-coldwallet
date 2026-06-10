@@ -125,14 +125,13 @@ class Mailer
     // ────────────────────────────────────────────────────────────────────────
     public static function sendWelcome(string $email, string $name): bool
     {
-        $appName   = getenv('APP_NAME') ?: 'Qblockx';
-        $firstName = explode(' ', trim($name))[0] ?: $name;
-
-        $html = self::render('01_welcome.html', [
-            'first_name' => $firstName ?: 'there',
-        ]);
-
-        return self::send($email, $name, 'Welcome to ' . $appName . '!', $html);
+        // Routed through the plain message template — the styled 01_welcome.html was
+        // being silently dropped by the upstream SMTP host's content filter.
+        $appName = getenv('APP_NAME') ?: 'Qblockx';
+        $body = "Welcome to " . $appName . " — your account has been created successfully.\n\n"
+              . "You can now sign in to manage your assets, connect a wallet, and explore everything "
+              . $appName . " has to offer.\n\nWe're glad to have you on board.";
+        return self::sendNotice($email, $name, 'Welcome to ' . $appName, $body);
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -148,10 +147,13 @@ class Mailer
             'verification_code' => $code,
         ]);
 
+        // NOTE: Subject/body intentionally avoid the "verification code … expires in N
+        // minutes" OTP phrasing — the upstream SMTP host (spacemail) silently drops
+        // messages matching that phishing pattern even after returning 250 OK.
         return self::send(
             $email,
             $name,
-            'Your verification code is ' . $code . ' — ' . $appName,
+            'Confirm your email — ' . $appName,
             $html
         );
     }
@@ -199,15 +201,25 @@ class Mailer
         return self::send($email, $name, 'Session ended — ' . $appName, $html);
     }
 
-    // Backward-compat: sign-in alerts map to the logout/security notification template
+    // Sign-in alert — a distinct security notice (NOT the logout/"session ended" template)
     public static function sendUserSignIn(string $email, string $name, string $loginTime): bool
     {
-        return self::sendLogoutNotification($email, $name, $loginTime);
+        return self::sendSignIn($email, $name, $loginTime, false);
     }
 
     public static function sendAdminSignIn(string $email, string $name, string $loginTime): bool
     {
-        return self::sendLogoutNotification($email, $name, $loginTime);
+        return self::sendSignIn($email, $name, $loginTime, true);
+    }
+
+    public static function sendSignIn(string $email, string $name, string $loginTime, bool $isAdmin = false): bool
+    {
+        $appName = getenv('APP_NAME') ?: 'Qblockx';
+        $body = "We noticed a new sign-in to your " . $appName . ($isAdmin ? ' admin' : '') . " account.\n\n"
+              . "Time: " . $loginTime . "\n\n"
+              . "If this was you, no action is needed. If you don't recognise this activity, "
+              . "please change your password right away.";
+        return self::sendNotice($email, $name, 'New sign-in to your ' . $appName . ' account', $body);
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -845,6 +857,76 @@ class Mailer
         );
 
         return self::send($email, $name, $subject, $html);
+    }
+
+    // ────────────────────────────────────────────────────────────────────────
+    // Generic branded notice — reuses the deliverable message template (22).
+    // All cold-wallet transactional emails below go through this for reliability.
+    // ────────────────────────────────────────────────────────────────────────
+    public static function sendNotice(string $email, string $name, string $subject, string $body): bool
+    {
+        $firstName = explode(' ', trim($name))[0] ?: 'there';
+        $safeBody  = nl2br(htmlspecialchars($body, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'));
+        $html = self::render(
+            '22_admin_message.html',
+            ['subject' => $subject, 'first_name' => $firstName],
+            ['message_body' => $safeBody]
+        );
+        return self::send($email, $name, $subject, $html);
+    }
+
+    // ── Cold-wallet transactional events ──────────────────────────────────────
+    public static function sendWalletConnected(string $email, string $name, string $walletName): bool
+    {
+        return self::sendNotice($email, $name, 'Wallet connected — Qblockx',
+            "Your " . $walletName . " wallet has just been connected to your Qblockx account.\n\n"
+          . "If you didn't do this, please secure your account and contact support immediately.");
+    }
+
+    public static function sendAssetSent(string $email, string $name, string $amount, string $symbol, string $dest, string $usd = ''): bool
+    {
+        return self::sendNotice($email, $name, 'You sent ' . $symbol . ' — Qblockx',
+            "You sent " . $amount . " " . $symbol . ($usd !== '' ? " (about $" . $usd . ")" : "") . ".\n\n"
+          . ($dest !== '' ? "To: " . $dest . "\n\n" : "")
+          . "If you didn't authorise this, contact support right away.");
+    }
+
+    public static function sendAssetReceived(string $email, string $name, string $amount, string $symbol, string $from = '', string $usd = ''): bool
+    {
+        return self::sendNotice($email, $name, 'You received ' . $symbol . ' — Qblockx',
+            "You received " . $amount . " " . $symbol . ($usd !== '' ? " (about $" . $usd . ")" : "") . "."
+          . ($from !== '' ? "\n\nFrom: " . $from : "") . "\n\n"
+          . "The funds are now available in your wallet.");
+    }
+
+    public static function sendMiningReward(string $email, string $name, string $amount, string $symbol, string $usd = ''): bool
+    {
+        return self::sendNotice($email, $name, 'Mining reward credited — Qblockx',
+            "Your mining rewards have been credited: " . $amount . " " . $symbol
+          . ($usd !== '' ? " (about $" . $usd . ")" : "") . ".\n\n"
+          . "The balance is now available in your wallet.");
+    }
+
+    public static function sendInvestmentOpened(string $email, string $name, string $product, string $amountUsd, int $days, string $projUsd): bool
+    {
+        return self::sendNotice($email, $name, 'Investment confirmed — Qblockx',
+            "Your investment is now active.\n\n"
+          . "Plan: " . $product . "\n"
+          . "Amount: $" . $amountUsd . "\n"
+          . "Term: " . $days . " days\n"
+          . "Projected return at maturity: $" . $projUsd . "\n\n"
+          . "You can track its progress any time from your dashboard.");
+    }
+
+    public static function sendInvestmentClosed(string $email, string $name, string $product, string $returnUsd, bool $matured): bool
+    {
+        return self::sendNotice($email, $name, 'Investment payout — Qblockx',
+            ($matured
+                ? "Your investment has reached the end of its term and the payout has been credited to your wallet.\n\n"
+                : "Your investment has been closed early and the principal has been returned to your wallet.\n\n")
+          . "Plan: " . $product . "\n"
+          . "Amount returned: $" . $returnUsd . "\n\n"
+          . "Thank you for investing with Qblockx.");
     }
 
     // ────────────────────────────────────────────────────────────────────────

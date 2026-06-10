@@ -8,6 +8,7 @@
 
 require_once '../../config/database.php';
 require_once '../../api/utilities/auth-check.php';
+require_once '../../api/utilities/http.php';
 header('Content-Type: application/json');
 
 requireAuth();
@@ -151,6 +152,26 @@ try {
             exit;
         }
 
+        // Active card — cashback % and spending limits
+        $cardStmt = $db->prepare(
+            "SELECT cashback_pct, daily_limit_usd, monthly_limit_usd
+               FROM virtual_cards WHERE user_id = :uid AND status = 'active'
+              ORDER BY id DESC LIMIT 1"
+        );
+        $cardStmt->execute(['uid' => $uid]);
+        $card         = $cardStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $cashbackPct  = (float) ($card['cashback_pct'] ?? 0);
+        $dailyLimit   = isset($card['daily_limit_usd'])   ? (float) $card['daily_limit_usd']   : null;
+        $monthlyLimit = isset($card['monthly_limit_usd']) ? (float) $card['monthly_limit_usd'] : null;
+
+        // Currency price + symbol (for USD value, limits, cashback)
+        $curStmt = $db->prepare("SELECT symbol, current_price_usd FROM currencies WHERE id = :cid");
+        $curStmt->execute(['cid' => $currencyId]);
+        $curRow    = $curStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        $symbol    = $curRow['symbol'] ?? '';
+        $price     = (float) ($curRow['current_price_usd'] ?? 0);
+        $amountUsd = $amount * $price;
+
         // Get wallet
         $wStmt = $db->prepare("SELECT * FROM wallets WHERE user_id = :uid AND currency_id = :cid");
         $wStmt->execute(['uid' => $uid, 'cid' => $currencyId]);
@@ -161,6 +182,36 @@ try {
             exit;
         }
 
+        // Enforce card spending limits (USD value of sends)
+        if ($amountUsd > 0 && ($dailyLimit !== null || $monthlyLimit !== null)) {
+            if ($dailyLimit !== null) {
+                $ds = $db->prepare(
+                    "SELECT COALESCE(SUM(amount_usd),0) FROM transactions
+                      WHERE user_id = :uid AND type = 'send'
+                        AND status IN ('pending','confirming','completed')
+                        AND DATE(created_at) = CURDATE()"
+                );
+                $ds->execute(['uid' => $uid]);
+                if (((float) $ds->fetchColumn()) + $amountUsd > $dailyLimit) {
+                    echo json_encode(['success' => false, 'message' => 'This send exceeds your daily limit of $' . number_format($dailyLimit, 0)]);
+                    exit;
+                }
+            }
+            if ($monthlyLimit !== null) {
+                $ms = $db->prepare(
+                    "SELECT COALESCE(SUM(amount_usd),0) FROM transactions
+                      WHERE user_id = :uid AND type = 'send'
+                        AND status IN ('pending','confirming','completed')
+                        AND YEAR(created_at) = YEAR(CURDATE()) AND MONTH(created_at) = MONTH(CURDATE())"
+                );
+                $ms->execute(['uid' => $uid]);
+                if (((float) $ms->fetchColumn()) + $amountUsd > $monthlyLimit) {
+                    echo json_encode(['success' => false, 'message' => 'This send exceeds your monthly limit of $' . number_format($monthlyLimit, 0)]);
+                    exit;
+                }
+            }
+        }
+
         // Calculate fee
         $feeStmt = $db->prepare(
             "SELECT fee_pct FROM fee_schedule WHERE card_tier = :tier AND fee_type = 'send' AND is_active = 1"
@@ -168,11 +219,6 @@ try {
         $feeStmt->execute(['tier' => $cardTier]);
         $feePct = (float) ($feeStmt->fetchColumn() ?: 1.5);
         $fee = $amount * ($feePct / 100);
-
-        // Get currency symbol
-        $symStmt = $db->prepare("SELECT symbol FROM currencies WHERE id = :cid");
-        $symStmt->execute(['cid' => $currencyId]);
-        $symbol = $symStmt->fetchColumn() ?: '';
 
         $recipientUserId = null;
         $recipientAddr   = $address;
@@ -202,11 +248,11 @@ try {
 
             // Log transaction
             $db->prepare(
-                "INSERT INTO transactions (user_id, wallet_id, type, amount, currency_id, currency_symbol,
+                "INSERT INTO transactions (user_id, wallet_id, type, amount, amount_usd, currency_id, currency_symbol,
                     recipient_address, recipient_user_id, fee, status, ip_address)
-                 VALUES (:uid, :wid, 'send', :amt, :cid, :sym, :addr, :ruid, :fee, 'pending', :ip)"
+                 VALUES (:uid, :wid, 'send', :amt, :ausd, :cid, :sym, :addr, :ruid, :fee, 'pending', :ip)"
             )->execute([
-                'uid' => $uid, 'wid' => $wallet['id'], 'amt' => $amount,
+                'uid' => $uid, 'wid' => $wallet['id'], 'amt' => $amount, 'ausd' => round($amountUsd, 2),
                 'cid' => $currencyId, 'sym' => $symbol,
                 'addr' => $recipientAddr, 'ruid' => $recipientUserId,
                 'fee' => $fee, 'ip' => $_SERVER['REMOTE_ADDR'] ?? null,
@@ -245,11 +291,55 @@ try {
                 ]);
             }
 
+            // QFS card cashback — credit a % of the send's USD value back to the sender's wallet
+            $cashbackCrypto = ($cashbackPct > 0 && $price > 0) ? ($amountUsd * $cashbackPct / 100) / $price : 0;
+            if ($cashbackCrypto > 0) {
+                $db->prepare("UPDATE wallets SET balance = balance + :amt WHERE id = :wid")
+                   ->execute(['amt' => $cashbackCrypto, 'wid' => $wallet['id']]);
+                $cbPctLabel = rtrim(rtrim(number_format($cashbackPct, 2), '0'), '.');
+                $db->prepare(
+                    "INSERT INTO transactions (user_id, wallet_id, type, amount, amount_usd, currency_id, currency_symbol, status, notes, completed_at)
+                     VALUES (:uid, :wid, 'admin_credit', :amt, :usd, :cid, :sym, 'completed', :notes, NOW())"
+                )->execute([
+                    'uid' => $uid, 'wid' => $wallet['id'], 'amt' => $cashbackCrypto,
+                    'usd' => round($amountUsd * $cashbackPct / 100, 2), 'cid' => $currencyId, 'sym' => $symbol,
+                    'notes' => $cbPctLabel . '% QFS card cashback',
+                ]);
+            }
+
             $db->commit();
-            echo json_encode(['success' => true, 'message' => 'Transaction submitted']);
         } catch (\Exception $e) {
             $db->rollBack();
             throw $e;
+        }
+
+        // Respond now; email after the connection closes (SMTP is slow)
+        $cbMsg = $cashbackCrypto > 0
+            ? ' • ' . rtrim(rtrim(number_format($cashbackPct, 2), '0'), '.') . '% cashback credited'
+            : '';
+        finish_response(['success' => true, 'message' => 'Transaction submitted' . $cbMsg]);
+
+        try {
+            require_once '../../api/utilities/email_templates.php';
+            $amtStr = rtrim(rtrim(number_format($amount, 8), '0'), '.');
+            $usdStr = $amountUsd > 0 ? number_format($amountUsd, 2) : '';
+            $sn = $db->prepare("SELECT full_name FROM users WHERE id = :u");
+            $sn->execute(['u' => $uid]);
+            $senderName = $sn->fetchColumn() ?: '';
+            $dest = $recipientUserId ? ('@' . ($recipient ?: 'Quantum BlocX user')) : ($recipientAddr ?: 'external wallet');
+            Mailer::sendAssetSent($auth['email'] ?? '', $senderName, $amtStr, $symbol, $dest, $usdStr);
+
+            if ($recipientUserId) {
+                $rn = $db->prepare("SELECT email, full_name FROM users WHERE id = :u");
+                $rn->execute(['u' => $recipientUserId]);
+                $rRow = $rn->fetch(PDO::FETCH_ASSOC);
+                if ($rRow && !empty($rRow['email'])) {
+                    $netStr = rtrim(rtrim(number_format($amount - $fee, 8), '0'), '.');
+                    Mailer::sendAssetReceived($rRow['email'], $rRow['full_name'] ?? '', $netStr, $symbol, $senderName ?: 'another user', $usdStr);
+                }
+            }
+        } catch (\Throwable $mailErr) {
+            error_log('send email error: ' . $mailErr->getMessage());
         }
         exit;
     }

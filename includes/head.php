@@ -8,6 +8,14 @@
 $pageTitle       = $pageTitle       ?? 'Qblockx';
 $pageDescription = $pageDescription ?? 'Qblockx is a cold wallet storage platform that keeps your private keys completely offline. Air-gapped security protects your crypto from remote hacks, malware, and phishing.';
 $pageKeywords    = $pageKeywords    ?? 'Qblockx, cold wallet, cold storage, offline crypto storage, air-gapped wallet, private key security, hardware wallet, self-custody';
+
+// Cache-bust static assets by file modification time so updates always load
+if (!function_exists('assetVer')) {
+    function assetVer(string $rel): string {
+        $path = dirname(__DIR__) . $rel;
+        return $rel . '?v=' . (@filemtime($path) ?: time());
+    }
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -39,15 +47,15 @@ $pageKeywords    = $pageKeywords    ?? 'Qblockx, cold wallet, cold storage, offl
   <link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=Fragment+Mono&display=swap" rel="stylesheet">
 
   <!-- Styles -->
-  <link rel="stylesheet" href="/assets/css/main.css">
-  <link rel="stylesheet" href="/assets/css/responsive.css">
-  <link rel="stylesheet" href="/assets/icons/style.css">
+  <link rel="stylesheet" href="<?= assetVer('/assets/css/main.css') ?>">
+  <link rel="stylesheet" href="<?= assetVer('/assets/css/responsive.css') ?>">
+  <link rel="stylesheet" href="<?= assetVer('/assets/icons/style.css') ?>">
 
   <!-- LightRays WebGL -->
-  <script src="/assets/js/light-rays.js" defer></script>
+  <script src="<?= assetVer('/assets/js/light-rays.js') ?>" defer></script>
 
   <!-- Main JS -->
-  <script src="/assets/js/main.js" defer></script>
+  <script src="<?= assetVer('/assets/js/main.js') ?>" defer></script>
 
   <!-- Favicon -->
   <link rel="icon"             type="image/x-icon"   href="/assets/favicon/favicon.ico">

