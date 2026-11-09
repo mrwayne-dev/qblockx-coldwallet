@@ -90,7 +90,8 @@ try {
 
     if ($curlError || ($httpCode !== 200 && $httpCode !== 201)) {
         // NOWPayments unreachable — report pending, frontend will retry
-        error_log('NOWPayments status check error (' . $httpCode . '): ' . ($curlError ?: $response));
+        // 404 = NOWPayments has no GET /v1/invoice/{id}; IPN webhook is authoritative.
+        if ($httpCode !== 404) error_log('NOWPayments status check error (' . $httpCode . '): ' . ($curlError ?: $response));
         echo json_encode(['success' => true, 'status' => 'pending']);
         exit;
     }

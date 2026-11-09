@@ -693,6 +693,11 @@
         amountEl.focus(); return;
       }
 
+      var sym = ov.querySelector('#cdCurrency').selectedOptions[0].textContent.split(' ')[0];
+      if (!window.confirm((type === 'credit' ? 'ADD ' : 'REMOVE ') + amount + ' ' + sym
+          + (type === 'credit' ? ' to ' : ' from ') + email
+          + '?\n\nThis adjusts the existing balance; it does not set it to this amount.')) return;
+
       this.disabled = true; this.textContent = 'Applying…';
       var r = await adminAction('credit_debit', {
         user_id: userId, currency_id: parseInt(cid),
@@ -735,6 +740,34 @@
     document.querySelectorAll('[data-nav]').forEach(function (el) {
       el.addEventListener('click', function () { activateSection(this.dataset.nav); });
     });
+
+    // Mobile "More" overflow sheet — opens drawer with the sections the 5-slot dock omits
+    (function () {
+      var sheet = document.getElementById('adminMoreSheet');
+      var btn   = document.getElementById('adminDockMoreBtn');
+      if (!sheet || !btn) return;
+      function open() {
+        sheet.hidden = false;
+        sheet.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+      }
+      function close() {
+        sheet.hidden = true;
+        sheet.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+      }
+      btn.addEventListener('click', open);
+      sheet.querySelectorAll('[data-more-close]').forEach(function (el) {
+        el.addEventListener('click', close);
+      });
+      // Any menu choice navigates (via the data-nav handler above) and then closes.
+      sheet.querySelectorAll('.more-item').forEach(function (el) {
+        el.addEventListener('click', close);
+      });
+      document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && !sheet.hidden) close();
+      });
+    })();
 
     // Sign-out loader — show overlay before navigating to logout
     document.querySelectorAll('a[href="/api/auth/logout.php"]').forEach(function (link) {

@@ -54,25 +54,42 @@ try {
             }
 
             // Handle file uploads
-            $uploadDir = '../../uploads/kyc/';
+            $uploadDir = __DIR__ . '/../../uploads/kyc/';
             if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
 
-            $frontUrl = '';
-            $backUrl  = '';
+            // Validated save: allow-listed type by real MIME (never the client's
+            // extension), size limit, random name. Returns [url|null, error|null].
+            $saveKycFile = function (string $field, string $side) use ($uploadDir, $uid): array {
+                if (empty($_FILES[$field]['tmp_name'])) return [null, null];
+                $f = $_FILES[$field];
+                if (($f['error'] ?? UPLOAD_ERR_OK) !== UPLOAD_ERR_OK) {
+                    return [null, 'Upload failed for the document ' . $side . ' (error ' . (int)$f['error'] . ')'];
+                }
+                if (!is_uploaded_file($f['tmp_name'])) return [null, 'Invalid upload'];
+                if ($f['size'] > 5 * 1024 * 1024) return [null, 'Document ' . $side . ' must be 5MB or smaller'];
 
-            if (!empty($_FILES['document_front']['tmp_name'])) {
-                $ext = pathinfo($_FILES['document_front']['name'], PATHINFO_EXTENSION);
-                $frontName = 'kyc_' . $uid . '_front_' . time() . '.' . $ext;
-                move_uploaded_file($_FILES['document_front']['tmp_name'], $uploadDir . $frontName);
-                $frontUrl = '/uploads/kyc/' . $frontName;
-            }
-            if (!empty($_FILES['document_back']['tmp_name'])) {
-                $ext = pathinfo($_FILES['document_back']['name'], PATHINFO_EXTENSION);
-                $backName = 'kyc_' . $uid . '_back_' . time() . '.' . $ext;
-                move_uploaded_file($_FILES['document_back']['tmp_name'], $uploadDir . $backName);
-                $backUrl = '/uploads/kyc/' . $backName;
-            }
+                $finfo = new finfo(FILEINFO_MIME_TYPE);
+                $mime  = $finfo->file($f['tmp_name']);
+                $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'application/pdf' => 'pdf'];
+                if (!isset($allowed[$mime])) {
+                    return [null, 'Document ' . $side . ' must be a JPG, PNG or PDF file'];
+                }
 
+                $name = 'kyc_' . $uid . '_' . $side . '_' . bin2hex(random_bytes(8)) . '.' . $allowed[$mime];
+                if (!move_uploaded_file($f['tmp_name'], $uploadDir . $name)) {
+                    error_log('profile.php KYC: move_uploaded_file failed for ' . $uploadDir . $name);
+                    return [null, 'Could not store the document ' . $side . ', please try again'];
+                }
+                return ['/uploads/kyc/' . $name, null];
+            };
+
+            [$frontUrl, $frontErr] = $saveKycFile('document_front', 'front');
+            [$backUrl,  $backErr]  = $saveKycFile('document_back',  'back');
+
+            if ($frontErr || $backErr) {
+                echo json_encode(['success' => false, 'message' => $frontErr ?: $backErr]);
+                exit;
+            }
             if (!$frontUrl) {
                 echo json_encode(['success' => false, 'message' => 'Document front photo is required']);
                 exit;

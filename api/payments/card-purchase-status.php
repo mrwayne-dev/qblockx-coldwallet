@@ -71,7 +71,10 @@ try {
     curl_close($ch);
 
     if ($curlError || ($httpCode !== 200 && $httpCode !== 201)) {
-        error_log('card status check (' . $httpCode . '): ' . ($curlError ?: $response));
+        // NOWPayments has no public GET /v1/invoice/{id} (always 404), so this
+        // fallback cannot confirm payment; the IPN webhook is the source of truth.
+        // Stay quiet on 404 to avoid flooding the error log.
+        if ($httpCode !== 404) error_log('card status check (' . $httpCode . '): ' . ($curlError ?: $response));
         echo json_encode(['success' => true, 'status' => 'pending']);
         exit;
     }

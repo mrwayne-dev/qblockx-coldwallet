@@ -993,6 +993,118 @@ body.admin-body .mobile-dock.admin-mobile-dock .dock-item--center.active {
   color: var(--color-accent);
 }
 
+/* ── Mobile "More" overflow sheet ─────────────────────── */
+body.admin-body .admin-more-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+body.admin-body .admin-more-sheet[hidden] { display: none; }
+
+body.admin-body .admin-more-sheet__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+  animation: adminMoreFade 0.18s ease-out;
+}
+
+body.admin-body .admin-more-sheet__panel {
+  position: relative;
+  width: 100%;
+  max-width: 520px;
+  background: var(--color-surface);
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+  box-shadow: 0 -12px 36px rgba(0, 0, 0, 0.18);
+  padding-bottom: calc(env(safe-area-inset-bottom, 0) + 0.75rem);
+  animation: adminMoreSlide 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+body.admin-body .admin-more-sheet__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem 0.5rem;
+  border-bottom: 1px solid var(--color-border);
+}
+
+body.admin-body .admin-more-sheet__title {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+body.admin-body .admin-more-sheet__close {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: 10px;
+  font-size: 1.1rem;
+}
+body.admin-body .admin-more-sheet__close:hover { background: var(--color-surface-2); color: var(--color-text); }
+
+body.admin-body .admin-more-sheet__items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+  padding: 1rem 1.25rem;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+body.admin-body .admin-more-sheet__items .more-item {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.85rem 0.9rem;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  color: var(--color-text);
+  font-size: 0.88rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+body.admin-body .admin-more-sheet__items .more-item i {
+  font-size: 1.15rem;
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+body.admin-body .admin-more-sheet__items .more-item:hover,
+body.admin-body .admin-more-sheet__items .more-item.active {
+  background: var(--color-accent-glow);
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+body.admin-body .admin-more-sheet__items .more-item.active i,
+body.admin-body .admin-more-sheet__items .more-item:hover i { color: var(--color-accent); }
+
+@keyframes adminMoreFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes adminMoreSlide {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+
 /* ── Quick Action Cards (overview) ──────────────────── */
 body.admin-body .quick-actions-row {
   display: grid;

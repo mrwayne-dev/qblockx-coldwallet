@@ -127,13 +127,25 @@ function refreshPricesFromCoinGecko(PDO $db): void {
          WHERE symbol = :symbol AND is_active = 1"
     );
 
+    // Append-only price log so a displayed USD total can be reconstructed later.
+    $historyStmt = $db->prepare(
+        "INSERT INTO price_history (currency_id, symbol, price_usd, change_24h_pct)
+         SELECT id, symbol, :price, :change FROM currencies WHERE symbol = :symbol AND is_active = 1"
+    );
+
     foreach ($geckoMap as $symbol => $geckoId) {
         if (isset($priceByGeckoId[$geckoId])) {
-            $updateStmt->execute([
+            $params = [
                 'price'  => $priceByGeckoId[$geckoId]['price'],
                 'change' => round($priceByGeckoId[$geckoId]['change'], 4),
                 'symbol' => $symbol,
-            ]);
+            ];
+            $updateStmt->execute($params);
+            try {
+                $historyStmt->execute($params);
+            } catch (\Throwable $e) {
+                error_log('price_history insert failed: ' . $e->getMessage()); // never break the refresh
+            }
         }
     }
 

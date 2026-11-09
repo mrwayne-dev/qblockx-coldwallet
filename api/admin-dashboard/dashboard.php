@@ -101,39 +101,64 @@ try {
                 echo json_encode(['success'=>false,'message'=>'Invalid parameters']); exit;
             }
 
-            // Get or create wallet
-            $w = $db->prepare("SELECT id, balance FROM wallets WHERE user_id=:uid AND currency_id=:cid");
-            $w->execute(['uid'=>$userId,'cid'=>$currencyId]);
-            $wallet = $w->fetch(PDO::FETCH_ASSOC);
-
-            if (!$wallet) {
-                $cNet = $db->prepare("SELECT network, symbol FROM currencies WHERE id=:cid");
-                $cNet->execute(['cid'=>$currencyId]);
-                $cInfo = $cNet->fetch(PDO::FETCH_ASSOC);
-                $addr = '0x'.bin2hex(random_bytes(20));
-                $db->prepare("INSERT INTO wallets (user_id,currency_id,address,network) VALUES (:uid,:cid,:addr,:net)")
-                   ->execute(['uid'=>$userId,'cid'=>$currencyId,'addr'=>$addr,'net'=>$cInfo['network']??'']);
-                $walletId = (int)$db->lastInsertId();
-                $balance = 0;
-                $symbol = $cInfo['symbol'] ?? '';
-            } else {
-                $walletId = (int)$wallet['id'];
-                $balance = (float)$wallet['balance'];
-                $symStmt = $db->prepare("SELECT symbol FROM currencies WHERE id=:cid");
-                $symStmt->execute(['cid'=>$currencyId]);
-                $symbol = $symStmt->fetchColumn() ?: '';
+            if (!in_array($type, ['admin_credit','admin_debit'], true)) {
+                echo json_encode(['success'=>false,'message'=>'Invalid type']); exit;
             }
 
-            if ($type === 'admin_debit' && $balance < $amount) {
-                echo json_encode(['success'=>false,'message'=>'Insufficient balance to debit']); exit;
+            $adminId = (int) ($_SESSION['user_id'] ?? 0);
+            $cStmt = $db->prepare("SELECT network, symbol FROM currencies WHERE id=:cid");
+            $cStmt->execute(['cid'=>$currencyId]);
+            $cInfo = $cStmt->fetch(PDO::FETCH_ASSOC);
+            if (!$cInfo) { echo json_encode(['success'=>false,'message'=>'Unknown currency']); exit; }
+            $symbol = $cInfo['symbol'];
+
+            $db->beginTransaction();
+            try {
+                // Lock the wallet row so concurrent adjustments can't interleave
+                $w = $db->prepare("SELECT id, balance FROM wallets WHERE user_id=:uid AND currency_id=:cid FOR UPDATE");
+                $w->execute(['uid'=>$userId,'cid'=>$currencyId]);
+                $wallet = $w->fetch(PDO::FETCH_ASSOC);
+
+                if (!$wallet) {
+                    $addr = '0x'.bin2hex(random_bytes(20));
+                    $db->prepare("INSERT INTO wallets (user_id,currency_id,address,network) VALUES (:uid,:cid,:addr,:net)")
+                       ->execute(['uid'=>$userId,'cid'=>$currencyId,'addr'=>$addr,'net'=>$cInfo['network']??'']);
+                    $walletId = (int)$db->lastInsertId();
+                    $before = '0';
+                } else {
+                    $walletId = (int)$wallet['id'];
+                    $before = $wallet['balance'];
+                }
+
+                if ($type === 'admin_debit' && round((float)$before - $amount, 8) < 0) {
+                    $db->rollBack();
+                    echo json_encode(['success'=>false,'message'=>'Insufficient balance to debit']); exit;
+                }
+
+                $op = ($type === 'admin_credit') ? '+' : '-';
+                $db->prepare("UPDATE wallets SET balance = balance $op :amt WHERE id=:wid")
+                   ->execute(['amt'=>$amount,'wid'=>$walletId]);
+                $aStmt = $db->prepare("SELECT balance FROM wallets WHERE id=:wid");
+                $aStmt->execute(['wid'=>$walletId]);
+                $after = $aStmt->fetchColumn();
+
+                $audit = sprintf('[admin #%d] %s %s %s: balance %s -> %s', $adminId,
+                    $type === 'admin_credit' ? 'credit' : 'debit', rtrim(rtrim(number_format($amount,8,'.',''),'0'),'.'), $symbol, $before, $after);
+                $fullNotes = $notes !== '' ? $audit.' | '.$notes : $audit;
+                $ip = $_SERVER['REMOTE_ADDR'] ?? null;
+
+                $db->prepare("INSERT INTO transactions (user_id,wallet_id,type,amount,currency_id,currency_symbol,status,notes,ip_address,completed_at) VALUES (:uid,:wid,:type,:amt,:cid,:sym,'completed',:notes,:ip,NOW())")
+                   ->execute(['uid'=>$userId,'wid'=>$walletId,'type'=>$type,'amt'=>$amount,'cid'=>$currencyId,'sym'=>$symbol,'notes'=>$fullNotes,'ip'=>$ip]);
+                $txId = (int)$db->lastInsertId();
+
+                $db->prepare("INSERT INTO activity_log (user_id,action,entity_type,entity_id,description,ip_address,user_agent) VALUES (:a,:act,'transaction',:eid,:d,:ip,:ua)")
+                   ->execute(['a'=>$adminId,'act'=>$type,'eid'=>$txId,'d'=>"target user #$userId; ".$fullNotes,'ip'=>$ip,'ua'=>substr($_SERVER['HTTP_USER_AGENT'] ?? '',0,500)]);
+
+                $db->commit();
+            } catch (\Throwable $e) {
+                if ($db->inTransaction()) $db->rollBack();
+                throw $e;
             }
-
-            $op = ($type === 'admin_credit') ? '+' : '-';
-            $db->prepare("UPDATE wallets SET balance = balance $op :amt WHERE id=:wid")
-               ->execute(['amt'=>$amount,'wid'=>$walletId]);
-
-            $db->prepare("INSERT INTO transactions (user_id,wallet_id,type,amount,currency_id,currency_symbol,status,notes,completed_at) VALUES (:uid,:wid,:type,:amt,:cid,:sym,'completed',:notes,NOW())")
-               ->execute(['uid'=>$userId,'wid'=>$walletId,'type'=>$type,'amt'=>$amount,'cid'=>$currencyId,'sym'=>$symbol,'notes'=>$notes]);
 
             echo json_encode(['success'=>true,'message'=>ucfirst(str_replace('_',' ',$type)).' applied']); exit;
         }

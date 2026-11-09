@@ -1,0 +1,14 @@
+# qblockx.com crontab entries
+#
+# There are currently NO scheduled jobs for this site. The old investment /
+# commodity / real-estate cron scripts (api/cron/*) were removed and their four
+# entries deleted from the host crontab. Prices refresh on request
+# (api/utilities/crypto-prices.php), deposits confirm via the NOWPayments IPN.
+#
+# The host crontab is SHARED with other sites. NEVER run `crontab <file>` with
+# only this file. To add an entry in future:
+#   crontab -l > /tmp/ct && cat deployment/crontab.txt >> /tmp/ct && crontab /tmp/ct && crontab -l
+# then confirm other sites' lines are still present.
+#
+# Format for future entries:
+# <schedule> /usr/local/bin/php /home/uvammbciwx/qblockx.com/api/cron/<script>.php >> /home/uvammbciwx/cron_logs/qblockx.log 2>&1

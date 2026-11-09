@@ -11,6 +11,13 @@ RewriteCond %{HTTP_HOST} !\.test$ [NC]
 RewriteCond %{HTTP_HOST} !\.local$ [NC]
 RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
 
+# ── Uploads are user-supplied: never serve scripts from there ─
+RewriteRule ^uploads/.*\.(php[0-9]?|phtml|phar|pl|py|cgi|sh)(/.*)?$ - [F,L,NC]
+
+# ── Internal docs / env templates / patches are not public ────
+RewriteRule ^(guide|test)\.md$ - [F,L,NC]
+RewriteRule ^(envlocal|envprod|.*\.patch)$ - [F,L,NC]
+
 # ── Redirect direct .php URL access to clean URL ─────────────
 # Prevents .php extensions appearing in browser address bar
 # Excludes /api/ paths — redirecting API calls breaks POST requests

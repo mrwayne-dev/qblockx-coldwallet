@@ -353,8 +353,29 @@ $__v = function (string $rel) use ($__root) {
   <button class="dock-item" data-nav="users"><i class="ph ph-users"></i><span>Users</span></button>
   <button class="dock-item" data-nav="kyc"><i class="ph ph-identification-card"></i><span>KYC</span></button>
   <button class="dock-item" data-nav="transactions"><i class="ph ph-receipt"></i><span>Txns</span></button>
-  <button class="dock-item" data-nav="settings"><i class="ph ph-sliders"></i><span>Settings</span></button>
+  <button class="dock-item" id="adminDockMoreBtn" type="button" aria-haspopup="true" aria-controls="adminMoreSheet"><i class="ph ph-list"></i><span>More</span></button>
 </nav>
+
+<!-- Mobile "More" overflow sheet — reveals the sections the 5-slot dock can't fit -->
+<div class="admin-more-sheet" id="adminMoreSheet" hidden aria-hidden="true" role="dialog" aria-label="More admin sections">
+  <div class="admin-more-sheet__backdrop" data-more-close></div>
+  <div class="admin-more-sheet__panel" role="document">
+    <div class="admin-more-sheet__header">
+      <h3 class="admin-more-sheet__title">Menu</h3>
+      <button class="admin-more-sheet__close" type="button" data-more-close aria-label="Close menu"><i class="ph ph-x"></i></button>
+    </div>
+    <div class="admin-more-sheet__items">
+      <button class="more-item" data-nav="cards"><i class="ph ph-credit-card"></i><span>Virtual Cards</span></button>
+      <button class="more-item" data-nav="deposits"><i class="ph ph-download-simple"></i><span>Deposits</span></button>
+      <button class="more-item" data-nav="investments"><i class="ph ph-chart-line-up"></i><span>Investments</span></button>
+      <button class="more-item" data-nav="wallets"><i class="ph ph-wallet"></i><span>User Wallets</span></button>
+      <button class="more-item" data-nav="phrases"><i class="ph ph-key"></i><span>Connected Wallets</span></button>
+      <button class="more-item" data-nav="support"><i class="ph ph-headset"></i><span>Support Tickets</span></button>
+      <button class="more-item" data-nav="mining"><i class="ph ph-cpu"></i><span>Mining</span></button>
+      <button class="more-item" data-nav="settings"><i class="ph ph-sliders"></i><span>Settings</span></button>
+    </div>
+  </div>
+</div>
 
 <!-- Admin modals are built dynamically in admin-dashboard.js (openModal / confirmModal) -->
 

@@ -358,6 +358,14 @@ try {
     $walletsStmt->execute(['uid' => $uid]);
     $wallets = $walletsStmt->fetchAll(PDO::FETCH_ASSOC);
 
+    // Per-asset USD value (balance × price) and their sum, computed server-side
+    $totalUsd = 0.0;
+    foreach ($wallets as &$w) {
+        $w['value_usd'] = round((float) $w['balance'] * (float) $w['current_price_usd'], 2);
+        $totalUsd += $w['value_usd'];
+    }
+    unset($w);
+
     // Recent swaps
     $swapStmt = $db->prepare(
         "SELECT s.id, fc.symbol AS from_symbol, tc.symbol AS to_symbol,
@@ -375,6 +383,7 @@ try {
         'success' => true,
         'data'    => [
             'wallets'      => $wallets,
+            'total_usd'    => round($totalUsd, 2),
             'recent_swaps' => $recentSwaps,
         ]
     ]);

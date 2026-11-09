@@ -4,7 +4,7 @@
  * Modal: Credit / Debit User Wallet
  *
  * Admin enters user email, amount, type (credit|debit), notes
- * → POST /api/admin-dashboard/credit-debit.php
+ * → POST /api/admin-dashboard/dashboard.php (action=credit_debit)
  * Creates a transaction record + adjusts wallet balance
  */
 ?>
