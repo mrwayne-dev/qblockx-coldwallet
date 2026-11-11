@@ -40,8 +40,8 @@ const COMPANY_DEFAULTS = [
     // BC (2 letters + 6 digits) so it reads correctly at a glance.
     'legal_name'          => 'Qblockx Ltd',
     'registration_number' => 'BC114826',
-    'jurisdiction'        => 'Saint Vincent and the Grenadines',
-    'registered_address'  => "Suite 305, Griffith Corporate Centre, PO Box 495, Kingstown, Saint Vincent and the Grenadines",
+    'jurisdiction'        => '',
+    'registered_address'  => '',
 
     // ── Trading name ─────────────────────────────────────────────────────
     'trading_as'          => 'Qblockx',
@@ -61,9 +61,7 @@ const COMPANY_DEFAULTS = [
     'crunchbase_url'      => '',
     'linkedin_url'        => '',
 
-    // ── Document dates ───────────────────────────────────────────────────
     'inception_date'      => '2023',
-    'docs_updated'        => '10 November 2026',
 ];
 
 /** Read a company fact: environment first, then COMPANY_DEFAULTS. */

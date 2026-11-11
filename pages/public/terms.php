@@ -35,16 +35,11 @@ require_once '../../includes/header.php';
     <div class="legal-page-container">
       <div class="qbx-prose" data-appear>
 
-        <span class="legal-page-date">
-          These terms apply from <?= htmlspecialchars(company_get('docs_updated')) ?>.
-        </span>
-
         <h2>1. Who this is between</h2>
         <p>
           These terms are between you and
           <strong><?= htmlspecialchars(company_get('legal_name')) ?></strong>
-          (<?= htmlspecialchars(company_get('registration_number')) ?>,
-          <?= htmlspecialchars(company_get('jurisdiction')) ?>), trading as
+          (<?= htmlspecialchars(company_get('registration_number')) ?>), trading as
           <?= htmlspecialchars(company_get('trading_as')) ?>. By creating an account or using the
           platform you accept them. If you do not agree, do not use the service.
         </p>
@@ -90,6 +85,7 @@ require_once '../../includes/header.php';
         <h2>6. Deposits and withdrawals</h2>
         <ul>
           <li>Deposits have a stated minimum and are credited when the source network confirms them.</li>
+          <li>Withdrawals and sends are available only once you have ordered a QFS Card and paid for it (through our NOWPayments checkout). Until the card is active, withdrawals are locked.</li>
           <li>Withdrawals are reviewed and, for crypto, released within
             <?= qbx_withdrawal_window() ?>; bank transfers take <?= qbx_bank_window() ?>. Times are
             targets, not guarantees, and may extend for security review or network conditions.</li>
@@ -151,9 +147,8 @@ require_once '../../includes/header.php';
 
         <h2>13. Governing law and contact</h2>
         <p>
-          These terms are governed by the laws of
-          <?= htmlspecialchars(company_get('jurisdiction')) ?>, and disputes are subject to its
-          courts, without affecting any non-excludable rights you have where you live. Questions:
+          These terms are governed by the laws that apply to the operating
+          entity named above, and disputes are subject to the competent courts, without affecting any non-excludable rights you have where you live. Questions:
           <a href="mailto:<?= htmlspecialchars(support_email()) ?>"><?= htmlspecialchars(support_email()) ?></a><?php if (company_has('compliance_email')): ?>;
           compliance: <a href="mailto:<?= htmlspecialchars(company_get('compliance_email')) ?>"><?= htmlspecialchars(company_get('compliance_email')) ?></a><?php endif; ?>.
         </p>

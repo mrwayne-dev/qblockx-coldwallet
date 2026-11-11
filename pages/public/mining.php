@@ -149,7 +149,7 @@ $qbx_mining = [
           <h2 id="who">Who can mine</h2>
           <p>
             Mining is a feature of the premium plans: <strong>VirtuElevate</strong> ($25,000) and
-            <strong>VirtuElite</strong> ($35,000). It is not enabled on a standard account. Those
+            <strong>VirtuElite</strong> ($35,000). It is not enabled on a standard account. To buy a plan you order the QFS Card and pay for it through our NOWPayments checkout; mining and withdrawals both unlock once the card is active. Those
             plans also reduce or remove the transaction and swap fees shown on the
             <a href="/withdrawals#fees">fee table</a>, which is the other side of what the plan is
             for.

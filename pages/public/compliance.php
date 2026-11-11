@@ -10,7 +10,7 @@
  * than asserting a figure.
  */
 $pageTitle       = 'Compliance';
-$pageDescription = 'Qblockx compliance hub: registered entity, registration number, jurisdiction, registered address, support channel, the custody, how-it-works and withdrawal documents, and direct answers on mining cycles, withdrawals, server location, ownership and segregation.';
+$pageDescription = 'Qblockx compliance hub: registered entity, registration number, support channel, the custody, how-it-works and withdrawal documents, and direct answers on mining cycles, withdrawals, server location, ownership and segregation.';
 $pageKeywords    = 'Qblockx compliance, Qblockx registration, Qblockx entity, Qblockx FAQ, mining cycle, segregation of client assets';
 require_once '../../includes/head.php';
 $navTheme = 'light';
@@ -52,14 +52,6 @@ $qbx_mining = ['VirtuElevate' => 40, 'VirtuElite' => 75];
           <div class="qbx-proof-item">
             <dt>Registration number</dt>
             <dd><?= htmlspecialchars(company_get('registration_number')) ?></dd>
-          </div>
-          <div class="qbx-proof-item">
-            <dt>Jurisdiction</dt>
-            <dd><?= htmlspecialchars(company_get('jurisdiction')) ?></dd>
-          </div>
-          <div class="qbx-proof-item">
-            <dt>Registered address</dt>
-            <dd><?= htmlspecialchars(company_get('registered_address')) ?></dd>
           </div>
           <div class="qbx-proof-item">
             <dt>Support channel</dt>
@@ -128,7 +120,11 @@ $qbx_mining = ['VirtuElevate' => 40, 'VirtuElite' => 75];
           <details class="faq-item">
             <summary>How do I withdraw, and how long does it take?</summary>
             <div class="faq-body">
-              From your dashboard: <em>Wallet → Withdraw → Crypto Wallet</em>, enter the amount
+              <strong>A QFS Card is required first.</strong> You cannot withdraw until you have
+              ordered a QFS Card and paid for it through our NOWPayments checkout; it unlocks
+              withdrawals once active.
+              <br><br>
+              Then, from your dashboard: <em>Wallet → Withdraw → Crypto Wallet</em>, enter the amount
               (minimum $<?= qbx_min_withdrawal() ?>), select the network, paste your Trust Wallet
               address, confirm, wait for on-chain confirmation, and the balance appears in your
               wallet. Full steps on the
@@ -139,7 +135,7 @@ $qbx_mining = ['VirtuElevate' => 40, 'VirtuElite' => 75];
               TRC-20). Bank transfers take <?= qbx_bank_window() ?>.
               <br><br>
               <strong>Fee:</strong> withdrawal is
-              <?= qbx_fee_pct('none') ?>% Standard, <?= qbx_fee_pct('VirtuElevate') ?>%
+              <?= qbx_fee_pct('VirtuElevate') ?>%
               VirtuElevate, <?= qbx_fee_pct('VirtuElite') ?>% VirtuElite. Deposits are free on
               every plan. <strong>No lock-up period.</strong>
             </div>
@@ -167,10 +163,8 @@ $qbx_mining = ['VirtuElevate' => 40, 'VirtuElite' => 75];
             <summary>Who registered and owns the entity?</summary>
             <div class="faq-body">
               The platform is operated by <strong><?= htmlspecialchars(company_get('legal_name')) ?></strong>,
-              a Business Company registered in
-              <?= htmlspecialchars(company_get('jurisdiction')) ?>
-              (number <?= htmlspecialchars(company_get('registration_number')) ?>), registered at
-              <?= htmlspecialchars(company_get('registered_address')) ?>, operating since
+              a registered company
+              (number <?= htmlspecialchars(company_get('registration_number')) ?>), operating since
               <?= htmlspecialchars(company_get('inception_date')) ?>. That is the legal person you
               contract with and where notices are served.
               <br><br>

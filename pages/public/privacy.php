@@ -34,13 +34,9 @@ require_once '../../includes/company-blocks.php';
     <div class="legal-page-container">
       <div class="qbx-prose" data-appear>
 
-        <span class="legal-page-date">
-          This policy applies from <?= htmlspecialchars(company_get('docs_updated')) ?>.
-        </span>
-
         <h2>1. Who controls your data</h2>
         <p>
-          <?= htmlspecialchars(company_get('legal_name')) ?> (<?= htmlspecialchars(company_get('jurisdiction')) ?>)
+          <?= htmlspecialchars(company_get('legal_name')) ?>
           is responsible for the personal data described here. Contact
           <a href="mailto:<?= htmlspecialchars(support_email()) ?>"><?= htmlspecialchars(support_email()) ?></a><?php if (company_has('compliance_email')): ?>
           or <a href="mailto:<?= htmlspecialchars(company_get('compliance_email')) ?>"><?= htmlspecialchars(company_get('compliance_email')) ?></a><?php endif; ?>.

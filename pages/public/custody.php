@@ -270,7 +270,7 @@ require_once '../../includes/company-blocks.php';
             </a>
             <a href="/company">
               <span class="qbx-related-title">The company behind this</span>
-              <span class="qbx-related-body">Registered entity, jurisdiction, address and the verification gap.</span>
+              <span class="qbx-related-body">Registered entity and the verification gap.</span>
             </a>
           </div>
 

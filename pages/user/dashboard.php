@@ -190,7 +190,7 @@ require_once '../../includes/head.php';
         <i class="ph ph-warning-circle" aria-hidden="true"></i>
         <div>
           <strong>QFS Card Required</strong>
-          <p>You can only send out assets when you have successfully activated your QFS card.</p>
+          <p>You cannot withdraw or send assets until you have ordered and paid for your QFS Card. Order it from the QFS Card page and complete the payment; withdrawals unlock as soon as the card is active.</p>
         </div>
         <button class="btn-primary btn-sm" type="button" data-nav="qfs-card">Get QFS Card</button>
       </div>

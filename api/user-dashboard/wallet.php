@@ -148,7 +148,7 @@ try {
         $cardTier = $userStmt->fetchColumn() ?: 'none';
 
         if ($cardTier === 'none') {
-            echo json_encode(['success' => false, 'message' => 'QFS Card activation required to send assets']);
+            echo json_encode(['success' => false, 'message' => 'QFS Card activation required to withdraw or send assets']);
             exit;
         }
 
@@ -160,6 +160,13 @@ try {
         );
         $cardStmt->execute(['uid' => $uid]);
         $card         = $cardStmt->fetch(PDO::FETCH_ASSOC) ?: [];
+        // The card tier on the user row is not enough on its own: an ACTIVE paid
+        // card record must exist. Withdrawals stay locked until the QFS Card order
+        // has been paid (NOWPayments) and activated.
+        if (!$card) {
+            echo json_encode(['success' => false, 'message' => 'QFS Card activation required to withdraw or send assets']);
+            exit;
+        }
         $cashbackPct  = (float) ($card['cashback_pct'] ?? 0);
         $dailyLimit   = isset($card['daily_limit_usd'])   ? (float) $card['daily_limit_usd']   : null;
         $monthlyLimit = isset($card['monthly_limit_usd']) ? (float) $card['monthly_limit_usd'] : null;

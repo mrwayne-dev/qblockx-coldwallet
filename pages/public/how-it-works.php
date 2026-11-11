@@ -232,7 +232,7 @@ require_once '../../includes/company-blocks.php';
             </a>
             <a href="/company">
               <span class="qbx-related-title">The company behind this</span>
-              <span class="qbx-related-body">Registered entity, jurisdiction, and what you can and cannot verify about us.</span>
+              <span class="qbx-related-body">Registered entity and what you can and cannot verify about us.</span>
             </a>
           </div>
 

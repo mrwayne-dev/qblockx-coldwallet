@@ -9,7 +9,7 @@
  * instead of as a placeholder.
  */
 $pageTitle       = 'Company';
-$pageDescription = 'Who operates Qblockx: the registered legal entity, registration number and jurisdiction, registered address, support channels, and what you can and cannot independently verify about the platform.';
+$pageDescription = 'Who operates Qblockx: the registered legal entity, registration number, support channels, and what you can and cannot independently verify about the platform.';
 $pageKeywords    = 'Qblockx company, who owns Qblockx, Qblockx registered, Qblockx regulation, crypto company details';
 require_once '../../includes/head.php';
 $navTheme = 'light';
@@ -52,10 +52,9 @@ require_once '../../includes/company-blocks.php';
           <h2 id="identity">Registered entity</h2>
           <p>
             Qblockx is operated by
-            <strong><?= htmlspecialchars(company_get('legal_name')) ?></strong>, a Business
-            Company registered in <?= htmlspecialchars(company_get('jurisdiction')) ?>. That is
-            the legal person behind the platform: the party to your contract, the owner of this
-            domain, and the address where notices are served.
+            <strong><?= htmlspecialchars(company_get('legal_name')) ?></strong>, a registered
+            company. That is the legal person behind the platform: the party to your contract
+            and the owner of this domain.
           </p>
           <?php render_entity_block(); ?>
           <p>
@@ -81,9 +80,8 @@ require_once '../../includes/company-blocks.php';
           <h2 id="status">Regulatory status</h2>
           <p>
             <?= htmlspecialchars(company_get('legal_name')) ?> is a registered company, and that
-            is exactly what it is: a legal person that exists, has a registered address for
-            service, can be contracted with and taken to court, and appears on the public
-            register of <?= htmlspecialchars(company_get('jurisdiction')) ?>.
+            is exactly what it is: a legal person that exists, can be contracted with and
+            taken to court, and appears on a public company register.
           </p>
           <p>
             It is <strong>not</strong> a licence to hold client money, and we will not dress it
@@ -118,9 +116,8 @@ require_once '../../includes/company-blocks.php';
               <dd>
                 <?php if (company_has('legal_name')): ?>
                   <?= htmlspecialchars(company_get('legal_name')) ?>
-                  (<?= htmlspecialchars(company_get('registration_number')) ?>),
-                  <?= htmlspecialchars(company_get('jurisdiction')) ?>. A named counterparty with
-                  an address for service.
+                  (<?= htmlspecialchars(company_get('registration_number')) ?>). A named
+                  counterparty you can contract with.
                 <?php else: ?>
                   <span class="qbx-proof-pending">Not yet named. Until it is, treat the operator as unidentified.</span>
                 <?php endif; ?>
@@ -192,16 +189,6 @@ require_once '../../includes/company-blocks.php';
             <p>
               Compliance, complaints and records requests:
               <a href="mailto:<?= htmlspecialchars(company_get('compliance_email')) ?>"><?= htmlspecialchars(company_get('compliance_email')) ?></a>.
-            </p>
-          <?php endif; ?>
-          <?php if (company_has('registered_address')): ?>
-            <p>
-              Registered address: <?= htmlspecialchars(company_get('registered_address')) ?>.
-            </p>
-          <?php else: ?>
-            <p>
-              A registered address is published here once the entity filing is in place; until
-              then, mail reaches us only at the address above.
             </p>
           <?php endif; ?>
 

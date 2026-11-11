@@ -52,6 +52,8 @@ require_once '../../../includes/company-blocks.php';
 
         <div class="qbx-prose">
 
+          <?php render_qfs_requirement(); ?>
+
           <h2 id="steps">Moving funds out to Trust Wallet, step by step</h2>
           <p>
             This is the path from a Qblockx balance to coins sitting in a wallet you control.
@@ -152,18 +154,17 @@ require_once '../../../includes/company-blocks.php';
                 <?php foreach (qbx_fee_rows() as $row): ?>
                   <tr<?= $row['highlight'] ? ' class="is-featured"' : '' ?>>
                     <th scope="row"><?= htmlspecialchars($row['tier']) ?></th>
-                    <td><?= qbx_pct($row['fees']['withdrawal']) ?>%</td>
-                    <td><?= qbx_pct($row['fees']['send']) ?>%</td>
-                    <td><?= qbx_pct($row['fees']['swap']) ?>%</td>
-                    <td><?= qbx_pct($row['fees']['receive']) ?>%</td>
+                    <td><?= qbx_fee_cell($row['tier'], 'withdrawal') ?></td>
+                    <td><?= qbx_fee_cell($row['tier'], 'send') ?></td>
+                    <td><?= qbx_fee_cell($row['tier'], 'swap') ?></td>
+                    <td><?= qbx_fee_cell($row['tier'], 'receive') ?></td>
                   </tr>
                 <?php endforeach; ?>
               </tbody>
             </table>
           </div>
           <p class="qbx-plain-inline">
-            Worked example, $10,000 out: Standard
-            <strong>$<?= number_format(10000 * qbx_fee_pct('none') / 100, 2) ?></strong>,
+            Worked example, $10,000 out (a QFS Card is required to withdraw at all):
             VirtuElevate
             <strong>$<?= number_format(10000 * qbx_fee_pct('VirtuElevate') / 100, 2) ?></strong>,
             VirtuElite <strong>$0.00</strong>.

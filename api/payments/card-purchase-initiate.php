@@ -49,6 +49,11 @@ try {
     // Clear any stale pending cards for this user so we don't pile them up
     $db->prepare("DELETE FROM virtual_cards WHERE user_id = :uid AND status = 'pending'")
        ->execute(['uid' => $user['id']]);
+    // ...and close the matching superseded purchase rows so abandoned attempts
+    // do not accumulate as 'pending' in the activity feed.
+    $db->prepare("UPDATE transactions SET status = 'cancelled', notes = CONCAT(COALESCE(notes,''), ' (superseded by a new order)')
+                   WHERE user_id = :uid AND type = 'card_purchase' AND status = 'pending'")
+       ->execute(['uid' => $user['id']]);
 
     // Create the pending card row first so we can reference its id in the order
     $db->prepare(

@@ -101,8 +101,7 @@ function render_verification_gaps(): void
         </ul>
       <?php else: ?>
         <p>The entity filing, audit and named counterparties described on this page are
-          published and independently checkable as of
-          <?= htmlspecialchars(company_get('docs_updated')) ?>.</p>
+          published and independently checkable.</p>
       <?php endif; ?>
       <p class="qbx-openq-foot">
         Questions on anything here:
@@ -160,6 +159,38 @@ function qbx_fee_rows(): array
     return $rows;
 }
 
+/**
+ * A fee-table cell. Standard accounts hold no QFS Card, and sending or withdrawing
+ * is locked until a card is ordered and paid for, so those two cells carry no fee.
+ */
+function qbx_fee_cell(string $tier, string $type): string
+{
+    if ($tier === 'Standard' && in_array($type, ['withdrawal', 'send'], true)) {
+        return 'QFS Card required';
+    }
+    return qbx_pct(QBX_FEES[$tier][$type] ?? 0.0) . '%';
+}
+
+/**
+ * The QFS Card requirement, stated once and reused so every page says the same thing.
+ */
+function render_qfs_requirement(): void
+{
+    ?>
+    <div class="qbx-plain" data-appear>
+      <span class="qbx-plain-label">QFS Card required to withdraw</span>
+      <p>
+        You cannot withdraw or send assets until you have ordered a QFS Card and paid for it.
+        Every plan is a QFS Card (<strong>VirtuElevate</strong>, $25,000, or
+        <strong>VirtuElite</strong>, $35,000): to buy a plan you order the card from the
+        <em>QFS Card</em> page of your dashboard, then pay the order through our NOWPayments
+        checkout. The card activates once the payment confirms, and withdrawals unlock at that
+        point.
+      </p>
+    </div>
+    <?php
+}
+
 function qbx_min_withdrawal(): int { return QBX_MIN_WITHDRAWAL; }
 function qbx_min_deposit(): int    { return QBX_MIN_DEPOSIT; }
 function qbx_withdrawal_window(): string { return QBX_WITHDRAW_WINDOW; }
@@ -207,8 +238,7 @@ function render_doc_date(): void
 {
     ?>
     <span class="legal-page-date">
-      Last updated <?= htmlspecialchars(company_get('docs_updated')) ?>.
-      Correct at the time of writing; if anything here is out of date, tell us at
+      If anything here is out of date, tell us at
       <a href="mailto:<?= htmlspecialchars(support_email()) ?>"><?= htmlspecialchars(support_email()) ?></a>
       and we will fix it.
     </span>

@@ -59,13 +59,15 @@ require_once '../../includes/company-blocks.php';
 
           <h2 id="quick">The short answer</h2>
           <ul>
-            <li><strong>You can always request a withdrawal.</strong> From the wallet in your dashboard, there is no approval needed to ask and no lock that bars you from asking.</li>
+            <li><strong>A QFS Card is required to withdraw.</strong> You cannot withdraw or send assets until you have ordered a QFS Card and paid for it through our NOWPayments checkout. Once the card is active, withdrawals unlock.</li>
             <li><strong>Two rails.</strong> Send crypto straight to your own wallet (Trust Wallet, MetaMask, or any address you control), or take a bank transfer.</li>
-            <li><strong>The fee depends only on your plan:</strong> <?= qbx_fee_pct('none') ?>% standard, <?= qbx_fee_pct('VirtuElevate') ?>% VirtuElevate, <?= qbx_fee_pct('VirtuElite') ?>% VirtuElite.</li>
+            <li><strong>The fee depends only on your plan:</strong> <?= qbx_fee_pct('VirtuElevate') ?>% VirtuElevate, <?= qbx_fee_pct('VirtuElite') ?>% VirtuElite.</li>
             <li><strong>Crypto withdrawals are reviewed and sent within <?= qbx_withdrawal_window() ?>.</strong></li>
             <li><strong>The crypto path needs no bank.</strong> If card and banking rails are jammed, an on-chain transfer still settles. More under
               <a href="#rails">If bank rails freeze</a>.</li>
           </ul>
+
+          <?php render_qfs_requirement(); ?>
 
           <!-- ── Fee schedule, read from the same source the app uses ── -->
           <h2 id="fees">Fees, by plan</h2>
@@ -89,10 +91,10 @@ require_once '../../includes/company-blocks.php';
                 <?php foreach (qbx_fee_rows() as $row): ?>
                   <tr<?= $row['highlight'] ? ' class="is-featured"' : '' ?>>
                     <th scope="row"><?= htmlspecialchars($row['tier']) ?></th>
-                    <td><?= qbx_pct($row['fees']['withdrawal']) ?>%</td>
-                    <td><?= qbx_pct($row['fees']['send']) ?>%</td>
-                    <td><?= qbx_pct($row['fees']['swap']) ?>%</td>
-                    <td><?= qbx_pct($row['fees']['receive']) ?>%</td>
+                    <td><?= qbx_fee_cell($row['tier'], 'withdrawal') ?></td>
+                    <td><?= qbx_fee_cell($row['tier'], 'send') ?></td>
+                    <td><?= qbx_fee_cell($row['tier'], 'swap') ?></td>
+                    <td><?= qbx_fee_cell($row['tier'], 'receive') ?></td>
                   </tr>
                 <?php endforeach; ?>
               </tbody>
@@ -100,9 +102,8 @@ require_once '../../includes/company-blocks.php';
           </div>
           <p class="qbx-plain-inline">
             On a $10,000 withdrawal that is
-            <strong>$<?= number_format(10000 * qbx_fee_pct('none') / 100, 2) ?></strong> standard,
             <strong>$<?= number_format(10000 * qbx_fee_pct('VirtuElevate') / 100, 2) ?></strong> on
-            VirtuElevate, and <strong>$0</strong> on VirtuElite. Network (on-chain) fees, if any
+            VirtuElevate and <strong>$0</strong> on VirtuElite. Network (on-chain) fees, if any
             apply, are shown to you before you confirm; we do not add a network-margin on top.
           </p>
 
@@ -145,8 +146,9 @@ require_once '../../includes/company-blocks.php';
             <li>
               <span class="qbx-step-n">1</span>
               <div>
-                <strong>Open your wallet.</strong> In your Qblockx dashboard go to
-                <em>Wallet</em> and press <em>Withdraw</em>.
+                <strong>Make sure your QFS Card is active.</strong> Withdrawals stay locked until you have
+                ordered the card from the <em>QFS Card</em> page and paid for it. Then open your
+                Qblockx dashboard wallet and press <em>Withdraw</em>.
               </div>
             </li>
             <li>
@@ -292,7 +294,7 @@ require_once '../../includes/company-blocks.php';
           <div class="faq-list">
             <details class="faq-item">
               <summary>Is there a lock-up or a penalty to withdraw?</summary>
-              <div class="faq-body">No lock-up and no exit penalty. You pay only the withdrawal fee for your plan (<?= qbx_fee_pct('none') ?>% standard, <?= qbx_fee_pct('VirtuElevate') ?>% VirtuElevate, <?= qbx_fee_pct('VirtuElite') ?>% VirtuElite). Funds you have deployed into a specific investment product follow that product's terms, which are shown before you commit.</div>
+              <div class="faq-body">No lock-up and no exit penalty. You pay only the withdrawal fee for your plan (<?= qbx_fee_pct('VirtuElevate') ?>% VirtuElevate, <?= qbx_fee_pct('VirtuElite') ?>% VirtuElite). Withdrawals need an active, paid QFS Card. Funds you have deployed into a specific investment product follow that product's terms, which are shown before you commit.</div>
             </details>
             <details class="faq-item">
               <summary>How fast is a withdrawal, really?</summary>
@@ -312,7 +314,7 @@ require_once '../../includes/company-blocks.php';
             </details>
             <details class="faq-item">
               <summary>Can someone stop me from withdrawing?</summary>
-              <div class="faq-body">You can always submit a withdrawal. We can administratively suspend <em>account access</em> (for example on a fraud report), which pauses convenience while it is investigated; it is not a seizure of on-chain funds you have already withdrawn. Keeping your own recovery material means you are never dependent on our systems to reach your crypto.</div>
+              <div class="faq-body">Once your QFS Card is active you can submit a withdrawal at any time. We can administratively suspend <em>account access</em> (for example on a fraud report), which pauses convenience while it is investigated; it is not a seizure of on-chain funds you have already withdrawn. Keeping your own recovery material means you are never dependent on our systems to reach your crypto.</div>
             </details>
           </div>
 
