@@ -6,6 +6,7 @@
 $pageTitle       = 'Home';
 $pageDescription = 'Qblockx keeps your private keys completely offline in an air-gapped cold wallet — disconnected from the internet and protected from remote hacks, malware, and phishing attacks.';
 $pageKeywords    = 'Qblockx, cold wallet, cold storage, offline crypto storage, air-gapped wallet, private key security, self-custody';
+require_once '../../includes/company-blocks.php';   // trust-bar chips + shared facts
 require_once '../../includes/head.php';
 ?>
 
@@ -50,6 +51,21 @@ require_once '../../includes/head.php';
           </a>
         </div>
 
+        <!-- Trust bar — rendered from qbx_trust_chips(), where every chip is mapped to the
+             document section that substantiates it. A chip whose claim no longer exists on
+             those pages should be deleted from the list, not left to become a false claim.
+             No audit, backer, customer or team chip: we have none of those to assert. -->
+        <ul class="hero-trustbar" aria-label="What Qblockx can substantiate">
+          <?php foreach (qbx_trust_chips() as $chip): ?>
+            <li class="hero-trustchip">
+              <a href="<?= htmlspecialchars($chip['href']) ?>">
+                <i class="ph <?= htmlspecialchars($chip['icon']) ?>" aria-hidden="true"></i>
+                <?= htmlspecialchars($chip['label']) ?>
+              </a>
+            </li>
+          <?php endforeach; ?>
+        </ul>
+
         <!-- Social proof -->
         <div class="hero-proof">
           <div class="hero-avatars" aria-hidden="true">
@@ -57,7 +73,7 @@ require_once '../../includes/head.php';
             <div class="hero-avatar" style="background:linear-gradient(135deg,#111C3A,#2262FF);"></div>
             <div class="hero-avatar" style="background:linear-gradient(135deg,#3FE0A1,#2262FF);"></div>
           </div>
-          <p class="hero-proof-text">Trusted by <strong>12,500+</strong> self-custody holders worldwide</p>
+          <p class="hero-proof-text">Self-custody cold storage — <strong>you hold the keys</strong></p>
         </div>
 
         <!-- Stats card — flows naturally centered -->
@@ -385,6 +401,8 @@ require_once '../../includes/head.php';
   </section>
 
 </main>
+
+<?php require_once '../../includes/footer.php'; ?>
 
 </body>
 </html>

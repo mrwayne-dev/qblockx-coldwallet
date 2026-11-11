@@ -40,13 +40,31 @@ RewriteRule ^forgot-password/?$        /pages/public/forgot-password.php    [L]
 RewriteRule ^reset-password/?$         /pages/public/reset-password.php     [QSA,L]
 RewriteRule ^verify-email/?$           /pages/public/verify-email.php       [QSA,L]
 RewriteRule ^contact/?$                /pages/public/contact.php            [L]
-RewriteRule ^about/?$                  /pages/public/about.php              [L]
+
+# ── Public information pages ──────────────────────────────────
+# These resolve to files in pages/public/. A rewrite to a MISSING file does not
+# 404: the catch-all further down serves the homepage with status 200, so the
+# broken link is invisible unless the file is checked. If you re-add /about,
+# /plans or any other route here, create the file in the same commit.
+# Canonical doc URLs live under /docs/. The short forms below are aliases to the
+# SAME files, so one edit updates both and neither can drift out of date.
+RewriteRule ^docs/how-it-works/?$      /pages/public/docs/how-it-works.php  [L]
+RewriteRule ^docs/custody/?$           /pages/public/docs/custody.php       [L]
+RewriteRule ^docs/withdrawals/?$       /pages/public/docs/withdrawals.php   [L]
+RewriteRule ^compliance/?$             /pages/public/compliance.php         [L]
+RewriteRule ^faq/?$                    /pages/public/compliance.php         [L]
+RewriteRule ^how-it-works/?$           /pages/public/how-it-works.php       [L]
+RewriteRule ^whitepaper/?$             /pages/public/how-it-works.php       [L]
+RewriteRule ^custody/?$                /pages/public/custody.php            [L]
+RewriteRule ^withdrawals/?$            /pages/public/withdrawals.php        [L]
+RewriteRule ^withdraw/?$               /pages/public/withdrawals.php        [L]
+RewriteRule ^liquidity/?$              /pages/public/withdrawals.php        [L]
+RewriteRule ^mining/?$                 /pages/public/mining.php             [L]
 RewriteRule ^company/?$                /pages/public/company.php            [L]
-RewriteRule ^solutions/?$              /pages/public/solutions.php          [L]
-RewriteRule ^products/?$               /pages/public/solutions.php          [L]
-RewriteRule ^learnmore/?$              /pages/public/learnmore.php          [L]
-RewriteRule ^help/?$                   /pages/public/learnmore.php          [L]
-RewriteRule ^security/?$               /pages/public/security.php           [L]
+# Dead-route shims: kept so existing inbound links and search hits land on real
+# content instead of silently showing the homepage.
+RewriteRule ^security/?$               /pages/public/custody.php            [L]
+RewriteRule ^about/?$                  /pages/public/company.php            [L]
 RewriteRule ^terms/?$                  /pages/public/terms.php              [L]
 RewriteRule ^privacy/?$                /pages/public/privacy.php            [L]
 RewriteRule ^risk/?$                   /pages/public/risk.php               [L]

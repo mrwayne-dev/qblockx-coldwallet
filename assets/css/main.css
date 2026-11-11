@@ -3084,3 +3084,508 @@ h1, h2, h3, h4 {
   .contact-form-row { grid-template-columns: 1fr; }
   .contact-section { padding-top: 120px; }
 }
+
+/* ============================================================
+   Documentation pages — /how-it-works, /custody, /company
+   Composed from existing tokens only; no new colours introduced.
+   ============================================================ */
+
+/* Sticky side nav for long doc pages */
+.qbx-doc-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: var(--space-16);
+  align-items: start;
+}
+.qbx-doc-aside {
+  position: sticky;
+  top: calc(var(--nav-height) + 24px);
+}
+.qbx-doc-aside-title {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-4);
+}
+.qbx-doc-toc {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 1px solid var(--color-border-mid);
+}
+.qbx-doc-toc a {
+  font-size: var(--text-sm);
+  line-height: 20px;
+  letter-spacing: -0.32px;
+  color: var(--color-text-body);
+  text-decoration: none;
+  padding: 6px 0 6px var(--space-4);
+  margin-left: -1px;
+  border-left: 1px solid transparent;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+}
+.qbx-doc-toc a:hover {
+  color: var(--color-accent);
+  border-left-color: var(--color-accent);
+}
+
+/* Prose container — wider than the legal column, prose measure kept readable */
+.qbx-prose { max-width: 720px; }
+.qbx-prose > :first-child { margin-top: 0; }
+.qbx-prose h2 {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: -0.6px;
+  color: var(--color-text);
+  margin: var(--space-12) 0 var(--space-4);
+  scroll-margin-top: calc(var(--nav-height) + 24px);
+}
+.qbx-prose h3 {
+  font-size: var(--text-base);
+  font-weight: 700;
+  letter-spacing: -0.32px;
+  color: var(--color-text);
+  margin: var(--space-8) 0 var(--space-3);
+}
+.qbx-prose p,
+.qbx-prose li {
+  font-size: var(--text-base);
+  line-height: 26px;
+  letter-spacing: -0.32px;
+  color: var(--color-text-body);
+}
+.qbx-prose p { margin-bottom: var(--space-4); }
+.qbx-prose ul,
+.qbx-prose ol { padding-left: var(--space-6); margin-bottom: var(--space-4); }
+.qbx-prose ul { list-style: disc; }
+.qbx-prose ol { list-style: decimal; }
+.qbx-prose li { margin-bottom: var(--space-2); }
+.qbx-prose a { color: var(--color-accent); text-decoration: underline; }
+.qbx-prose strong { color: var(--color-text); font-weight: 600; }
+
+/* Plain-language translation of a term — sits under the technical statement */
+.qbx-plain {
+  background: var(--color-surface);
+  border-left: 2px solid var(--color-accent);
+  border-radius: 0 var(--radius-inner) var(--radius-inner) 0;
+  padding: var(--space-4) var(--space-5);
+  margin: var(--space-5) 0;
+}
+.qbx-plain-label {
+  display: block;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+.qbx-plain p { margin: 0; font-size: var(--text-sm); line-height: 22px; }
+
+/* Registered-entity / fact table */
+.qbx-factbox {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-mid);
+  border-radius: var(--radius-card);
+  padding: var(--space-6);
+  margin: var(--space-6) 0;
+}
+.qbx-factbox-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: -0.32px;
+  color: var(--color-text);
+  margin-bottom: var(--space-4);
+}
+.qbx-factbox-title i { font-size: 16px; color: var(--color-accent); }
+.qbx-factbox-list { margin: 0; }
+.qbx-factbox-row {
+  display: grid;
+  grid-template-columns: 168px minmax(0, 1fr);
+  gap: var(--space-4);
+  padding: 10px 0;
+  border-top: 1px solid var(--color-border-mid);
+}
+.qbx-factbox-row:first-child { border-top: none; padding-top: 0; }
+.qbx-factbox-row dt {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  letter-spacing: -0.32px;
+}
+.qbx-factbox-row dd {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: -0.32px;
+  color: var(--color-text);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.qbx-factbox-foot {
+  font-size: var(--text-sm) !important;
+  line-height: 22px !important;
+  color: var(--color-text-body) !important;
+  margin: var(--space-4) 0 0 !important;
+}
+
+/* The self-custody / premium-tier reconciliation panel (dark, on white page) */
+.qbx-reconcile { padding: var(--space-16) var(--space-8); }
+.qbx-reconcile .section-title { color: #FFFFFF; }
+.qbx-reconcile-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-8);
+  margin-top: var(--space-10);
+}
+.qbx-reconcile-col {
+  border-radius: var(--radius-card);
+  padding: var(--space-6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+}
+.qbx-reconcile-col--accent { border-color: rgba(34, 98, 255, 0.35); background: rgba(34, 98, 255, 0.08); }
+.qbx-reconcile-kicker {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(211, 216, 233, 0.60);
+  margin-bottom: var(--space-3);
+}
+.qbx-reconcile-col h3 {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.48px;
+  color: #FFFFFF;
+  margin-bottom: var(--space-3);
+}
+.qbx-reconcile-col p {
+  font-size: var(--text-sm);
+  line-height: 22px;
+  letter-spacing: -0.32px;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: var(--space-3);
+}
+.qbx-reconcile-col p:last-child { margin-bottom: 0; }
+.qbx-reconcile-note {
+  margin-top: var(--space-8);
+  padding-top: var(--space-6);
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  font-size: var(--text-sm);
+  line-height: 22px;
+  letter-spacing: -0.32px;
+  color: rgba(211, 216, 233, 0.55);
+}
+
+/* Honest, unlinked partner strip on /company (distinct from the hero ticker) */
+.qbx-proof-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: var(--space-6);
+}
+.qbx-proof-item {
+  border: 1px solid var(--color-border-mid);
+  border-radius: var(--radius-inner);
+  padding: var(--space-5);
+}
+.qbx-proof-item dt {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: -0.32px;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+.qbx-proof-item dd {
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: 21px;
+  letter-spacing: -0.32px;
+  color: var(--color-text-body);
+}
+.qbx-proof-pending { color: var(--color-text-muted); font-style: italic; }
+
+/* The self-declared verification gap */
+.qbx-openq {
+  background: var(--color-navy-deep);
+  border-radius: var(--radius-card);
+  padding: var(--space-8);
+  margin: var(--space-12) 0 0;
+  color: var(--color-text-on-dark);
+}
+.qbx-openq-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.48px;
+  color: #FFFFFF;
+  margin-bottom: var(--space-4);
+}
+.qbx-openq-title i { font-size: 20px; color: #7BA4FF; }
+.qbx-openq p {
+  font-size: var(--text-sm);
+  line-height: 22px;
+  letter-spacing: -0.32px;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: var(--space-4);
+}
+.qbx-openq-list { padding-left: var(--space-5); margin-bottom: var(--space-4); list-style: disc; }
+.qbx-openq-list li {
+  font-size: var(--text-sm);
+  line-height: 22px;
+  letter-spacing: -0.32px;
+  color: rgba(255, 255, 255, 0.70);
+  margin-bottom: var(--space-2);
+}
+.qbx-openq a { color: #7BA4FF; text-decoration: underline; }
+.qbx-openq-foot { margin: 0 !important; padding-top: var(--space-4); border-top: 1px solid rgba(255, 255, 255, 0.07); }
+
+/* Cross-links to the other doc pages */
+.qbx-related {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: var(--space-6);
+}
+.qbx-related a {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-5);
+  border: 1px solid var(--color-border-mid);
+  border-radius: var(--radius-inner);
+  text-decoration: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+.qbx-related a:hover { border-color: var(--color-accent); box-shadow: var(--shadow-card-lg); }
+.qbx-related-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  letter-spacing: -0.32px;
+  color: var(--color-text);
+}
+.qbx-related-body {
+  font-size: var(--text-sm);
+  line-height: 21px;
+  letter-spacing: -0.32px;
+  color: var(--color-text-body);
+}
+
+/* In-page doc links row, under the footer panel */
+.qbx-doc-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  padding: var(--space-6) 0 0;
+}
+.qbx-doc-links a {
+  font-size: var(--text-sm);
+  letter-spacing: -0.32px;
+  color: rgba(255, 255, 255, 0.55);
+  text-decoration: none;
+}
+.qbx-doc-links a:hover { color: #FFFFFF; }
+
+@media (max-width: 1000px) {
+  .qbx-doc-layout { grid-template-columns: 1fr; gap: var(--space-8); }
+  .qbx-doc-aside { position: static; }
+  .qbx-doc-toc { flex-direction: row; flex-wrap: wrap; border-left: none; }
+  .qbx-doc-toc a { padding: 4px var(--space-3) 4px 0; border-left: none; }
+}
+@media (max-width: 760px) {
+  .qbx-reconcile-cols,
+  .qbx-proof-grid,
+  .qbx-related { grid-template-columns: 1fr; }
+  .qbx-reconcile { padding: var(--space-10) var(--space-5); }
+  .qbx-factbox-row { grid-template-columns: 1fr; gap: 2px; }
+}
+
+/* ── Footer entity block (compliance details, every page) ───── */
+.footer-entity {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-8);
+  padding-bottom: var(--space-6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+}
+.footer-entity-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  line-height: 20px;
+  letter-spacing: -0.32px;
+}
+.footer-entity-row dt {
+  color: rgba(255, 255, 255, 0.40);
+  min-width: 74px;
+  flex-shrink: 0;
+}
+.footer-entity-row dd {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.65);
+  overflow-wrap: anywhere;
+}
+.footer-entity-row a {
+  color: rgba(255, 255, 255, 0.65);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.footer-entity-row a:hover { color: #FFFFFF; }
+
+/* ── Withdrawal / mining guides: fee table, rails, steps ─────── */
+.qbx-feetable-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border-mid);
+  border-radius: var(--radius-card);
+  margin: var(--space-6) 0;
+}
+.qbx-feetable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  min-width: 460px;
+}
+.qbx-feetable th,
+.qbx-feetable td {
+  text-align: left;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--color-border-mid);
+  letter-spacing: -0.32px;
+}
+.qbx-feetable thead th {
+  font-size: var(--text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  background: var(--color-surface);
+}
+.qbx-feetable tbody th[scope="row"] {
+  font-weight: 700;
+  color: var(--color-text);
+}
+.qbx-feetable td { color: var(--color-text-body); }
+.qbx-feetable tr:last-child th,
+.qbx-feetable tr:last-child td { border-bottom: none; }
+.qbx-feetable tr.is-featured th,
+.qbx-feetable tr.is-featured td { background: var(--color-accent-10); color: var(--color-text); }
+.qbx-plain-inline {
+  font-size: var(--text-sm);
+  line-height: 22px;
+  letter-spacing: -0.32px;
+  color: var(--color-text-body);
+}
+
+/* Two-way rails (crypto vs bank) */
+.qbx-rails {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: var(--space-6) 0;
+}
+.qbx-rail {
+  border: 1px solid var(--color-border-mid);
+  border-radius: var(--radius-card);
+  padding: var(--space-6);
+  background: var(--color-surface);
+}
+.qbx-rail--alt { background: #FFFFFF; }
+.qbx-rail-kicker {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin-bottom: var(--space-2);
+}
+.qbx-rail h3 {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: -0.48px;
+  color: var(--color-text);
+  margin-bottom: var(--space-3);
+}
+.qbx-rail ul { padding-left: var(--space-5); margin-bottom: var(--space-3); list-style: disc; }
+.qbx-rail li { font-size: var(--text-sm); line-height: 22px; color: var(--color-text-body); margin-bottom: var(--space-1); }
+.qbx-rail p { font-size: var(--text-sm); line-height: 22px; color: var(--color-text-body); }
+.qbx-rail-note {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border-mid);
+  color: var(--color-text-muted) !important;
+}
+
+/* Numbered how-to steps */
+.qbx-steps {
+  list-style: none;
+  padding: 0;
+  margin: var(--space-6) 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.qbx-steps li {
+  display: grid;
+  grid-template-columns: 40px minmax(0,1fr);
+  gap: var(--space-4);
+  align-items: start;
+  margin: 0;
+}
+.qbx-step-n {
+  width: 40px; height: 40px;
+  border-radius: 12px;
+  background: var(--color-accent-10);
+  color: var(--color-accent);
+  font-family: var(--font-display);
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.qbx-steps li strong { color: var(--color-text); }
+.qbx-steps li div { font-size: var(--text-base); line-height: 24px; letter-spacing: -0.32px; color: var(--color-text-body); padding-top: 8px; }
+@media (max-width: 760px) {
+  .qbx-rails { grid-template-columns: 1fr; }
+}
+
+/* ── Hero trust bar — factual chips, each linking to its evidence ── */
+.hero-trustbar {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0;
+  margin: var(--space-6) 0 0;
+  max-width: 720px;
+  margin-inline: auto;
+}
+.hero-trustchip a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.82);
+  font-size: var(--text-sm);
+  letter-spacing: -0.32px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: border-color var(--transition-fast), color var(--transition-fast),
+              background var(--transition-fast);
+}
+.hero-trustchip a:hover {
+  border-color: rgba(34, 98, 255, 0.55);
+  background: rgba(34, 98, 255, 0.14);
+  color: #FFFFFF;
+}
+.hero-trustchip i { font-size: 14px; color: #7BA4FF; }

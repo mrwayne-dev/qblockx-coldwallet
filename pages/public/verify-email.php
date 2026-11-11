@@ -115,5 +115,7 @@ require_once '../../includes/head.php';
 </style>
 
 
+<?php require_once '../../includes/footer.php'; ?>
+
 </body>
 </html>
