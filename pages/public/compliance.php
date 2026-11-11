@@ -50,10 +50,6 @@ $qbx_mining = ['VirtuElevate' => 40, 'VirtuElite' => 75];
         </p>
         <dl class="qbx-proof-grid" data-appear>
           <div class="qbx-proof-item">
-            <dt>Registration number</dt>
-            <dd><?= htmlspecialchars(company_get('registration_number')) ?></dd>
-          </div>
-          <div class="qbx-proof-item">
             <dt>Support channel</dt>
             <dd>
               <a href="mailto:<?= htmlspecialchars(support_email()) ?>"><?= htmlspecialchars(support_email()) ?></a>
@@ -163,8 +159,8 @@ $qbx_mining = ['VirtuElevate' => 40, 'VirtuElite' => 75];
             <summary>Who registered and owns the entity?</summary>
             <div class="faq-body">
               The platform is operated by <strong><?= htmlspecialchars(company_get('legal_name')) ?></strong>,
-              a registered company
-              (number <?= htmlspecialchars(company_get('registration_number')) ?>), operating since
+              a registered company,
+              operating since
               <?= htmlspecialchars(company_get('inception_date')) ?>. That is the legal person you
               contract with and where notices are served.
               <br><br>

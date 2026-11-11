@@ -39,7 +39,7 @@ const COMPANY_DEFAULTS = [
     // credible-but-light jurisdiction. The number format matches a real SVG
     // BC (2 letters + 6 digits) so it reads correctly at a glance.
     'legal_name'          => 'Qblockx Ltd',
-    'registration_number' => 'BC114826',
+    'registration_number' => '',
     'jurisdiction'        => '',
     'registered_address'  => '',
 

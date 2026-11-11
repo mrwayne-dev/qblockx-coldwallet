@@ -115,8 +115,7 @@ require_once '../../includes/company-blocks.php';
               <dt>Registered legal entity</dt>
               <dd>
                 <?php if (company_has('legal_name')): ?>
-                  <?= htmlspecialchars(company_get('legal_name')) ?>
-                  (<?= htmlspecialchars(company_get('registration_number')) ?>). A named
+                  <?= htmlspecialchars(company_get('legal_name')) ?>. A named
                   counterparty you can contract with.
                 <?php else: ?>
                   <span class="qbx-proof-pending">Not yet named. Until it is, treat the operator as unidentified.</span>

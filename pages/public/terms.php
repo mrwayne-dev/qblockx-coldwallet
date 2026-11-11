@@ -38,8 +38,7 @@ require_once '../../includes/header.php';
         <h2>1. Who this is between</h2>
         <p>
           These terms are between you and
-          <strong><?= htmlspecialchars(company_get('legal_name')) ?></strong>
-          (<?= htmlspecialchars(company_get('registration_number')) ?>), trading as
+          <strong><?= htmlspecialchars(company_get('legal_name')) ?></strong>, trading as
           <?= htmlspecialchars(company_get('trading_as')) ?>. By creating an account or using the
           platform you accept them. If you do not agree, do not use the service.
         </p>
