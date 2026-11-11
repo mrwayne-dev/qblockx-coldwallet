@@ -9,7 +9,7 @@
  * instead of as a placeholder.
  */
 $pageTitle       = 'Company';
-$pageDescription = 'Who operates Qblockx: the registered legal entity, registration number, support channels, and what you can and cannot independently verify about the platform.';
+$pageDescription = 'Who operates Qblockx: the registered legal entity, support channels, and what you can and cannot independently verify about the platform.';
 $pageKeywords    = 'Qblockx company, who owns Qblockx, Qblockx registered, Qblockx regulation, crypto company details';
 require_once '../../includes/head.php';
 $navTheme = 'light';

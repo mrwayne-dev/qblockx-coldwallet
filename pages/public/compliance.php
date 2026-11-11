@@ -10,7 +10,7 @@
  * than asserting a figure.
  */
 $pageTitle       = 'Compliance';
-$pageDescription = 'Qblockx compliance hub: registered entity, registration number, support channel, the custody, how-it-works and withdrawal documents, and direct answers on mining cycles, withdrawals, server location, ownership and segregation.';
+$pageDescription = 'Qblockx compliance hub: registered entity, support channel, the custody, how-it-works and withdrawal documents, and direct answers on mining cycles, withdrawals, server location, ownership and segregation.';
 $pageKeywords    = 'Qblockx compliance, Qblockx registration, Qblockx entity, Qblockx FAQ, mining cycle, segregation of client assets';
 require_once '../../includes/head.php';
 $navTheme = 'light';
